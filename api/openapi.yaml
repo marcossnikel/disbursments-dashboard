@@ -1,0 +1,280 @@
+openapi: 3.0.3
+info:
+  title: Cadana Disbursement API
+  version: 1.0.0
+  description: Initiates and observes in-memory worker disbursement batches.
+servers:
+  - url: http://localhost:8080
+paths:
+  /workers:
+    get:
+      operationId: listWorkers
+      summary: List workers with an available payment obligation
+      responses:
+        "200":
+          description: Available workers
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Worker"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /disbursements:
+    post:
+      operationId: submitDisbursements
+      summary: Submit an immutable disbursement batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitBatchRequest"
+      responses:
+        "202":
+          description: A new batch was accepted for processing
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitBatchResponse"
+        "200":
+          description: An exact idempotent replay returned the existing batch
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitBatchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: The batch ID conflicts or one or more workers are unavailable
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /disbursements/{batch_id}:
+    get:
+      operationId: getDisbursementBatch
+      summary: Read the latest immutable snapshot of a batch
+      parameters:
+        - $ref: "#/components/parameters/BatchID"
+      responses:
+        "200":
+          description: Current batch snapshot
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchSnapshot"
+        "404":
+          description: Batch not found
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+components:
+  headers:
+    RequestID:
+      description: Correlates the HTTP request with structured backend logs.
+      schema:
+        type: string
+  parameters:
+    BatchID:
+      name: batch_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/BatchID"
+  responses:
+    BadRequest:
+      description: Invalid request
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Unexpected server error
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/RequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    BatchID:
+      type: string
+      minLength: 1
+      example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
+    WorkerID:
+      type: string
+      minLength: 1
+      example: w-001
+    Currency:
+      type: string
+      enum: [USD, EUR]
+    Worker:
+      type: object
+      additionalProperties: false
+      required: [id, name, amount, currency]
+      properties:
+        id:
+          $ref: "#/components/schemas/WorkerID"
+        name:
+          type: string
+          minLength: 1
+          example: Ada Lovelace
+        amount:
+          type: string
+          pattern: '^\d+\.\d{2}$'
+          example: "1500.50"
+        currency:
+          $ref: "#/components/schemas/Currency"
+    SubmitBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [batch_id, worker_ids]
+      properties:
+        batch_id:
+          $ref: "#/components/schemas/BatchID"
+        worker_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/WorkerID"
+    SubmitBatchResponse:
+      type: object
+      additionalProperties: false
+      required: [batch_id]
+      properties:
+        batch_id:
+          $ref: "#/components/schemas/BatchID"
+    BatchStatus:
+      type: string
+      enum: [processing, completed]
+    DisbursementStatus:
+      type: string
+      enum: [pending, success, failed, outcome_unknown]
+    ProviderErrorCode:
+      type: string
+      enum: [provider_declined, provider_error, provider_timeout]
+    DisbursementResult:
+      type: object
+      additionalProperties: false
+      required:
+        - disbursement_id
+        - worker_id
+        - worker_name
+        - amount
+        - currency
+        - status
+      properties:
+        disbursement_id:
+          type: string
+          example: disb-fc09316e
+        worker_id:
+          $ref: "#/components/schemas/WorkerID"
+        worker_name:
+          type: string
+        amount:
+          type: string
+          pattern: '^\d+\.\d{2}$'
+        currency:
+          $ref: "#/components/schemas/Currency"
+        status:
+          $ref: "#/components/schemas/DisbursementStatus"
+        provider_transaction_id:
+          type: string
+          description: Present only when status is success.
+          example: ptx-e41723a4
+        error_code:
+          allOf:
+            - $ref: "#/components/schemas/ProviderErrorCode"
+          description: Present only when status is failed or outcome_unknown.
+        error_message:
+          type: string
+          description: Present only when status is failed or outcome_unknown.
+    BatchSnapshot:
+      type: object
+      additionalProperties: false
+      required: [batch_id, status, results]
+      properties:
+        batch_id:
+          $ref: "#/components/schemas/BatchID"
+        status:
+          $ref: "#/components/schemas/BatchStatus"
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/DisbursementResult"
+    ErrorCode:
+      type: string
+      enum:
+        - invalid_request
+        - batch_not_found
+        - idempotency_conflict
+        - workers_unavailable
+        - internal_error
+    UnavailableReason:
+      type: string
+      enum: [already_pending, already_paid, outcome_unknown]
+    UnavailableWorker:
+      type: object
+      additionalProperties: false
+      required:
+        - worker_id
+        - worker_name
+        - reason
+        - batch_id
+        - disbursement_id
+      properties:
+        worker_id:
+          $ref: "#/components/schemas/WorkerID"
+        worker_name:
+          type: string
+        reason:
+          $ref: "#/components/schemas/UnavailableReason"
+        batch_id:
+          $ref: "#/components/schemas/BatchID"
+        disbursement_id:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, request_id]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+        request_id:
+          type: string
+        unavailable_workers:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnavailableWorker"
