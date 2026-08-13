@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ type Processor struct {
 	applicationContext context.Context
 	provider           PaymentProvider
 	providerTimeout    time.Duration
+	logger             *slog.Logger
 
 	mu          sync.RWMutex
 	workerOrder []WorkerID
@@ -30,6 +32,7 @@ var ErrInvalidSubmission = errors.New("invalid submission")
 type ProcessorConfig struct {
 	Provider        PaymentProvider
 	ProviderTimeout time.Duration
+	Logger          *slog.Logger
 }
 
 type obligationStatus uint8
@@ -73,6 +76,10 @@ func NewProcessor(
 	if config.ProviderTimeout <= 0 {
 		return nil, fmt.Errorf("%w: provider timeout must be positive", ErrInvalidProcessor)
 	}
+	logger := config.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 
 	workerOrder := make([]WorkerID, 0, len(workers))
 	obligations := make(map[WorkerID]*obligation, len(workers))
@@ -91,6 +98,7 @@ func NewProcessor(
 		applicationContext: applicationContext,
 		provider:           config.Provider,
 		providerTimeout:    config.ProviderTimeout,
+		logger:             logger,
 		workerOrder:        workerOrder,
 		obligations:        obligations,
 		batches:            make(map[BatchID]*batch),
@@ -122,8 +130,10 @@ func (p *Processor) Submit(batchID BatchID, workerIDs []WorkerID) (Submission, e
 	if existingBatch, exists := p.batches[batchID]; exists {
 		p.mu.Unlock()
 		if slices.Equal(existingBatch.canonicalWorkerIDs, canonicalWorkerIDs) {
+			p.logger.Info("disbursement batch replayed", "batch_id", batchID)
 			return Submission{BatchID: batchID, Created: false}, nil
 		}
+		p.logger.Warn("disbursement batch ID conflict", "batch_id", batchID)
 		return Submission{}, &IdempotencyConflictError{BatchID: batchID}
 	}
 
@@ -137,6 +147,11 @@ func (p *Processor) Submit(batchID BatchID, workerIDs []WorkerID) (Submission, e
 	unavailableWorkers := p.unavailableWorkersLocked(workerIDs)
 	if len(unavailableWorkers) > 0 {
 		p.mu.Unlock()
+		p.logger.Warn(
+			"disbursement batch rejected",
+			"batch_id", batchID,
+			"unavailable_worker_count", len(unavailableWorkers),
+		)
 		return Submission{}, &WorkersUnavailableError{Workers: unavailableWorkers}
 	}
 
@@ -171,6 +186,11 @@ func (p *Processor) Submit(batchID BatchID, workerIDs []WorkerID) (Submission, e
 	}
 	p.jobs.Add(len(requests))
 	p.mu.Unlock()
+	p.logger.Info(
+		"disbursement batch accepted",
+		"batch_id", batchID,
+		"worker_count", len(workerIDs),
+	)
 
 	for _, request := range requests {
 		go p.processPayment(batchID, request)
@@ -245,7 +265,6 @@ func (p *Processor) processPayment(batchID BatchID, request PaymentRequest) {
 	paymentResult, err := p.provider.Pay(ctx, request)
 
 	p.mu.Lock()
-	defer p.mu.Unlock()
 
 	storedBatch := p.batches[batchID]
 	result := storedBatch.results[request.WorkerID]
@@ -258,6 +277,28 @@ func (p *Processor) processPayment(batchID BatchID, request PaymentRequest) {
 		p.recordFailureLocked(result, currentObligation, err)
 	}
 	storedBatch.pendingCount--
+	completed := storedBatch.pendingCount == 0
+	resultSnapshot := *result
+	p.mu.Unlock()
+
+	logLevel := slog.LevelInfo
+	if resultSnapshot.Status == StatusFailed || resultSnapshot.Status == StatusOutcomeUnknown {
+		logLevel = slog.LevelWarn
+	}
+	p.logger.Log(
+		p.applicationContext,
+		logLevel,
+		"disbursement result recorded",
+		"batch_id", batchID,
+		"disbursement_id", resultSnapshot.DisbursementID,
+		"worker_id", resultSnapshot.Worker.ID(),
+		"status", resultSnapshot.Status,
+		"provider_transaction_id", resultSnapshot.ProviderTransactionID,
+		"error_code", resultSnapshot.ErrorCode,
+	)
+	if completed {
+		p.logger.Info("disbursement batch completed", "batch_id", batchID)
+	}
 }
 
 func (p *Processor) recordFailureLocked(result *Result, currentObligation *obligation, err error) {
