@@ -18,6 +18,10 @@ import {
   totalsByCurrency,
   type Worker,
 } from "@/features/disbursements/formatMoney";
+import type { components } from "@/api/generated/schema";
+import { BatchConflictNotice } from "@/features/disbursements/BatchConflictNotice";
+
+type UnavailableWorker = components["schemas"]["UnavailableWorker"];
 
 type BatchConfirmationDialogProps = {
   open: boolean;
@@ -27,6 +31,9 @@ type BatchConfirmationDialogProps = {
   isSubmitting: boolean;
   errorMessage?: string;
   requestID?: string;
+  unavailableWorkers?: readonly UnavailableWorker[];
+  onViewPaymentDetails: () => void;
+  onContinueWithAvailableWorkers: () => void;
 };
 
 export function BatchConfirmationDialog({
@@ -37,8 +44,13 @@ export function BatchConfirmationDialog({
   isSubmitting,
   errorMessage,
   requestID,
+  unavailableWorkers,
+  onViewPaymentDetails,
+  onContinueWithAvailableWorkers,
 }: BatchConfirmationDialogProps) {
   const totals = totalsByCurrency(workers);
+  const hasAvailabilityConflict = unavailableWorkers !== undefined && unavailableWorkers.length > 0;
+  const availableWorkerCount = workers.length - (unavailableWorkers?.length ?? 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -89,7 +101,16 @@ export function BatchConfirmationDialog({
           </div>
         </div>
 
-        {errorMessage ? (
+        {hasAvailabilityConflict ? (
+          <BatchConflictNotice
+            unavailableWorkers={unavailableWorkers}
+            availableWorkerCount={availableWorkerCount}
+            requestID={requestID}
+            onCancel={() => onOpenChange(false)}
+            onViewPaymentDetails={onViewPaymentDetails}
+            onContinueWithAvailableWorkers={onContinueWithAvailableWorkers}
+          />
+        ) : errorMessage ? (
           <div className="border-t px-6 py-4">
             <Alert variant="destructive" className="border-status-danger/15 bg-status-danger-soft">
               <TriangleAlert aria-hidden="true" />
@@ -104,26 +125,28 @@ export function BatchConfirmationDialog({
           </div>
         ) : null}
 
-        <DialogFooter className="m-0 rounded-none px-6 py-4">
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isSubmitting}>
-              Go back
+        {!hasAvailabilityConflict ? (
+          <DialogFooter className="m-0 rounded-none px-6 py-4">
+            <DialogClose asChild>
+              <Button variant="outline" disabled={isSubmitting}>
+                Go back
+              </Button>
+            </DialogClose>
+            <Button onClick={onConfirm} className="gap-2" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+                  Starting batch…
+                </>
+              ) : (
+                <>
+                  Confirm and disburse
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </>
+              )}
             </Button>
-          </DialogClose>
-          <Button onClick={onConfirm} className="gap-2" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-                Starting batch…
-              </>
-            ) : (
-              <>
-                Confirm and disburse
-                <ArrowRight aria-hidden="true" className="size-4" />
-              </>
-            )}
-          </Button>
-        </DialogFooter>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

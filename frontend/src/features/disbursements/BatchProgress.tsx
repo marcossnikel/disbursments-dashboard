@@ -4,6 +4,7 @@ import {
   Clock3,
   Info,
   LoaderCircle,
+  RotateCcw,
   RefreshCw,
   TriangleAlert,
 } from "lucide-react";
@@ -24,6 +25,8 @@ type BatchProgressProps = {
   refreshFailed: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
+  retryingWorkerID: string | null;
+  onPrepareRetry: (workerID: string) => void;
 };
 
 const statusDetails = {
@@ -59,6 +62,8 @@ export function BatchProgress({
   refreshFailed,
   isRefreshing,
   onRefresh,
+  retryingWorkerID,
+  onPrepareRetry,
 }: BatchProgressProps) {
   const counts = countStatuses(batch);
   const completedCount = batch.results.length - counts.pending;
@@ -161,11 +166,27 @@ export function BatchProgress({
                     <p className="mt-2 text-sm text-white/65">{result.error_message}</p>
                   ) : null}
                 </div>
-                <div className="text-left sm:text-right">
+                <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
                   <p className="font-semibold text-white tabular-nums">
                     {formatMoney(result.amount, result.currency)}
                   </p>
                   <p className="text-xs text-white/40">{result.currency}</p>
+                  {result.status === "failed" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-1 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                      aria-label={`Prepare retry for ${result.worker_name}`}
+                      disabled={retryingWorkerID !== null}
+                      onClick={() => onPrepareRetry(result.worker_id)}
+                    >
+                      <RotateCcw
+                        aria-hidden="true"
+                        className={cn(retryingWorkerID === result.worker_id && "animate-spin")}
+                      />
+                      {retryingWorkerID === result.worker_id ? "Preparing…" : "Prepare retry"}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             );

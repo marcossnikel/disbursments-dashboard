@@ -25,12 +25,15 @@ export function DisbursementDashboard() {
     () => new Set(),
   );
   const [isConfirmationOpen, setConfirmationOpen] = useState(false);
-  const [activeBatchID, setActiveBatchID] = useState<string | null>(null);
+  const [activeBatchID, setActiveBatchID] = useState<string | null>(readBatchIDFromURL);
+  const [retryingWorkerID, setRetryingWorkerID] = useState<string | null>(null);
+  const [retryPreparationError, setRetryPreparationError] = useState<string | null>(null);
   const batchQuery = useQuery(batchQueryOptions(activeBatchID));
   const submitBatchMutation = useMutation({
     mutationFn: submitBatch,
     onSuccess: (submission) => {
       setActiveBatchID(submission.batch_id);
+      writeBatchIDToURL(submission.batch_id);
       setConfirmationOpen(false);
       setSelectedWorkerIDs(new Set());
       void queryClient.invalidateQueries({ queryKey: workersQueryKey });
@@ -60,19 +63,6 @@ export function DisbursementDashboard() {
   const workers = workersQuery.data;
   const selectedWorkers = workers.filter((worker) => selectedWorkerIDs.has(worker.id));
 
-  if (workers.length === 0) {
-    return (
-      <Card className="border-dashed bg-white/75 py-16 text-center">
-        <CardContent>
-          <p className="text-lg font-semibold">No pending disbursements</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Every available worker obligation has already been processed or reserved.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   function toggleWorker(workerID: string) {
     setSelectedWorkerIDs((currentSelection) => {
       const nextSelection = new Set(currentSelection);
@@ -94,6 +84,68 @@ export function DisbursementDashboard() {
 
   const submissionError =
     submitBatchMutation.error instanceof ApiError ? submitBatchMutation.error : undefined;
+  const unavailableWorkers =
+    submissionError?.details?.code === "workers_unavailable"
+      ? submissionError.details.unavailable_workers
+      : undefined;
+
+  function continueWithAvailableWorkers() {
+    const unavailableWorkerIDs = new Set(
+      unavailableWorkers?.map((worker) => worker.worker_id) ?? [],
+    );
+    setSelectedWorkerIDs(
+      new Set(
+        selectedWorkers
+          .filter((worker) => !unavailableWorkerIDs.has(worker.id))
+          .map((worker) => worker.id),
+      ),
+    );
+    setConfirmationOpen(false);
+    submitBatchMutation.reset();
+  }
+
+  function viewConflictingPayment() {
+    const batchID = unavailableWorkers?.[0]?.batch_id;
+    if (!batchID) {
+      return;
+    }
+    setActiveBatchID(batchID);
+    writeBatchIDToURL(batchID);
+    setConfirmationOpen(false);
+    submitBatchMutation.reset();
+  }
+
+  async function prepareRetry(workerID: string) {
+    setRetryingWorkerID(workerID);
+    setRetryPreparationError(null);
+
+    try {
+      const refreshedWorkers = await workersQuery.refetch();
+      if (refreshedWorkers.isError) {
+        setRetryPreparationError(
+          "We couldn't refresh this worker. No retry was started; check the connection and try again.",
+        );
+        return;
+      }
+      const workerIsAvailable = refreshedWorkers.data?.some((worker) => worker.id === workerID);
+      if (!workerIsAvailable) {
+        setRetryPreparationError(
+          "This worker is no longer available for a new batch. Review the original payment before taking another action.",
+        );
+        return;
+      }
+
+      setSelectedWorkerIDs(new Set([workerID]));
+      submitBatchMutation.reset();
+      setConfirmationOpen(true);
+    } catch {
+      setRetryPreparationError(
+        "We couldn't refresh this worker. No retry was started; check the connection and try again.",
+      );
+    } finally {
+      setRetryingWorkerID(null);
+    }
+  }
 
   return (
     <>
@@ -103,6 +155,8 @@ export function DisbursementDashboard() {
           refreshFailed={batchQuery.isRefetchError}
           isRefreshing={batchQuery.isFetching}
           onRefresh={() => void batchQuery.refetch()}
+          retryingWorkerID={retryingWorkerID}
+          onPrepareRetry={(workerID) => void prepareRetry(workerID)}
         />
       ) : null}
       {activeBatchID !== null && batchQuery.isPending ? <BatchLoadingState /> : null}
@@ -119,12 +173,30 @@ export function DisbursementDashboard() {
           </AlertDescription>
         </Alert>
       ) : null}
-      <WorkerSelection
-        workers={workers}
-        selectedWorkerIDs={selectedWorkerIDs}
-        onToggleWorker={toggleWorker}
-        onReviewBatch={() => setConfirmationOpen(true)}
-      />
+      {retryPreparationError ? (
+        <Alert className="mb-6 border-status-warning/20 bg-status-warning-soft">
+          <AlertCircle aria-hidden="true" />
+          <AlertTitle>Retry was not prepared</AlertTitle>
+          <AlertDescription>{retryPreparationError}</AlertDescription>
+        </Alert>
+      ) : null}
+      {workers.length === 0 ? (
+        <Card className="border-dashed bg-white/75 py-16 text-center">
+          <CardContent>
+            <p className="text-lg font-semibold">No pending disbursements</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Every available worker obligation has already been processed or reserved.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <WorkerSelection
+          workers={workers}
+          selectedWorkerIDs={selectedWorkerIDs}
+          onToggleWorker={toggleWorker}
+          onReviewBatch={() => setConfirmationOpen(true)}
+        />
+      )}
       <BatchConfirmationDialog
         open={isConfirmationOpen}
         workers={selectedWorkers}
@@ -138,9 +210,22 @@ export function DisbursementDashboard() {
         isSubmitting={submitBatchMutation.isPending}
         errorMessage={submitBatchMutation.error?.message}
         requestID={submissionError?.requestID}
+        unavailableWorkers={unavailableWorkers}
+        onViewPaymentDetails={viewConflictingPayment}
+        onContinueWithAvailableWorkers={continueWithAvailableWorkers}
       />
     </>
   );
+}
+
+function readBatchIDFromURL(): string | null {
+  return new URLSearchParams(window.location.search).get("batch");
+}
+
+function writeBatchIDToURL(batchID: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("batch", batchID);
+  window.history.replaceState(null, "", url);
 }
 
 function BatchLoadingState() {
