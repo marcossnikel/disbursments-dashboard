@@ -15,7 +15,7 @@ check-generated:
 	git diff --exit-code -- backend/internal/openapi/generated.go frontend/src/api/generated/schema.ts
 
 build:
-	cd backend && go build ./cmd/api
+	cd backend && go build ./...
 	cd frontend && pnpm build
 
 lint:
