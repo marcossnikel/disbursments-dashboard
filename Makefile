@@ -1,4 +1,4 @@
-.PHONY: backend frontend generate check-generated
+.PHONY: backend frontend build generate check-generated lint test test-race verify
 
 backend:
 	cd backend && go run ./cmd/api
@@ -13,3 +13,22 @@ generate:
 check-generated:
 	$(MAKE) generate
 	git diff --exit-code -- backend/internal/openapi/generated.go frontend/src/api/generated/schema.ts
+
+build:
+	cd backend && go build ./cmd/api
+	cd frontend && pnpm build
+
+lint:
+	cd backend && go vet ./...
+	cd frontend && pnpm lint
+	cd frontend && pnpm format:check
+	cd frontend && pnpm typecheck
+
+test:
+	cd backend && go test ./...
+	cd frontend && pnpm test
+
+test-race:
+	cd backend && go test -race ./...
+
+verify: lint test test-race build check-generated

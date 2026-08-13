@@ -1,4 +1,9 @@
-import { ArrowRight, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  ArrowRight,
+  LoaderCircle,
+  ShieldCheck,
+  TriangleAlert,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -49,8 +54,10 @@ export function BatchConfirmationDialog({
   onContinueWithAvailableWorkers,
 }: BatchConfirmationDialogProps) {
   const totals = totalsByCurrency(workers);
-  const hasAvailabilityConflict = unavailableWorkers !== undefined && unavailableWorkers.length > 0;
-  const availableWorkerCount = workers.length - (unavailableWorkers?.length ?? 0);
+  const hasAvailabilityConflict =
+    unavailableWorkers !== undefined && unavailableWorkers.length > 0;
+  const availableWorkerCount =
+    workers.length - (unavailableWorkers?.length ?? 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -58,13 +65,14 @@ export function BatchConfirmationDialog({
         <DialogHeader className="border-b px-6 py-5">
           <div className="mb-1 flex items-center gap-2 text-primary">
             <ShieldCheck aria-hidden="true" className="size-4" />
-            <span className="text-xs font-semibold tracking-[0.12em] uppercase">Final review</span>
+            <span className="text-xs font-semibold tracking-[0.12em] uppercase">
+              Final review
+            </span>
           </div>
-          <DialogTitle className="text-xl">
-            Confirm this batch
-          </DialogTitle>
+          <DialogTitle className="text-xl">Confirm this batch</DialogTitle>
           <DialogDescription>
-            Review every worker and currency total before starting provider payments.
+            Review every worker and currency total before starting provider
+            payments.
           </DialogDescription>
         </DialogHeader>
 
@@ -76,13 +84,17 @@ export function BatchConfirmationDialog({
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{worker.name}</p>
-                <p className="font-mono text-xs text-muted-foreground">{worker.id}</p>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {worker.id}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold tabular-nums">
                   {formatMoney(worker.amount, worker.currency)}
                 </p>
-                <p className="text-xs text-muted-foreground">{worker.currency}</p>
+                <p className="text-xs text-muted-foreground">
+                  {worker.currency}
+                </p>
               </div>
             </div>
           ))}
@@ -94,7 +106,10 @@ export function BatchConfirmationDialog({
           </p>
           <div className="flex flex-wrap gap-2">
             {[...totals].map(([currency, minorUnits]) => (
-              <Badge key={currency} className="rounded-full bg-white/10 px-3 py-1 text-white">
+              <Badge
+                key={currency}
+                className="rounded-full bg-white/10 px-3 py-1 text-white"
+              >
                 {formatMinorUnits(minorUnits, currency)}
               </Badge>
             ))}
@@ -112,13 +127,18 @@ export function BatchConfirmationDialog({
           />
         ) : errorMessage ? (
           <div className="border-t px-6 py-4">
-            <Alert variant="destructive" className="border-status-danger/15 bg-status-danger-soft">
+            <Alert
+              variant="destructive"
+              className="border-status-danger/15 bg-status-danger-soft"
+            >
               <TriangleAlert aria-hidden="true" />
               <AlertTitle>The batch wasn't started</AlertTitle>
               <AlertDescription>
                 {errorMessage}
                 {requestID ? (
-                  <span className="mt-1 block font-mono text-xs">Request {requestID}</span>
+                  <span className="mt-1 block font-mono text-xs">
+                    Request {requestID}
+                  </span>
                 ) : null}
               </AlertDescription>
             </Alert>
@@ -132,10 +152,17 @@ export function BatchConfirmationDialog({
                 Go back
               </Button>
             </DialogClose>
-            <Button onClick={onConfirm} className="gap-2" disabled={isSubmitting}>
+            <Button
+              onClick={onConfirm}
+              className="gap-2"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? (
                 <>
-                  <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="size-4 animate-spin"
+                  />
                   Starting batch…
                 </>
               ) : (

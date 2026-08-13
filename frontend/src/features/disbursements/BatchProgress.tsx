@@ -1,7 +1,6 @@
 import {
   CheckCircle2,
   CircleAlert,
-  Clock3,
   Info,
   LoaderCircle,
   RotateCcw,
@@ -14,7 +13,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { BatchIDCopyButton } from "@/features/disbursements/BatchIDCopyButton";
 import { formatMoney } from "@/features/disbursements/formatMoney";
 import type { BatchSnapshot } from "@/features/disbursements/queries";
@@ -38,7 +41,8 @@ const statusDetails = {
   },
   success: {
     label: "Success",
-    description: "The provider confirmed the payment and returned a transaction ID.",
+    description:
+      "The provider confirmed the payment and returned a transaction ID.",
     className: "bg-status-success-soft text-status-success",
     icon: CheckCircle2,
   },
@@ -68,7 +72,9 @@ export function BatchProgress({
   const counts = countStatuses(batch);
   const completedCount = batch.results.length - counts.pending;
   const completionPercentage =
-    batch.results.length === 0 ? 0 : Math.round((completedCount / batch.results.length) * 100);
+    batch.results.length === 0
+      ? 0
+      : Math.round((completedCount / batch.results.length) * 100);
 
   return (
     <Card className="mb-6 overflow-hidden border-0 bg-secondary text-secondary-foreground shadow-2xl shadow-black/15">
@@ -78,13 +84,20 @@ export function BatchProgress({
             <div>
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
                 {batch.status === "processing" ? (
-                  <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+                  <LoaderCircle
+                    aria-hidden="true"
+                    className="size-4 animate-spin"
+                  />
                 ) : (
                   <CheckCircle2 aria-hidden="true" className="size-4" />
                 )}
-                {batch.status === "processing" ? "Batch processing" : "Batch complete"}
+                {batch.status === "processing"
+                  ? "Batch processing"
+                  : "Batch complete"}
               </div>
-              <h2 className="text-2xl font-semibold tracking-tight">Live payment results</h2>
+              <h2 className="text-2xl font-semibold tracking-tight">
+                Live payment results
+              </h2>
             </div>
             <BatchIDCopyButton batchID={batch.batch_id} />
           </div>
@@ -94,25 +107,42 @@ export function BatchProgress({
               <span>{completedCount} terminal results</span>
               <span>{completionPercentage}%</span>
             </div>
-            <Progress value={completionPercentage} className="h-1.5 bg-white/10" />
+            <Progress
+              value={completionPercentage}
+              className="h-1.5 bg-white/10"
+            />
           </div>
 
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <SummaryCount label="Pending" value={counts.pending} />
             <SummaryCount label="Succeeded" value={counts.success} />
             <SummaryCount label="Failed" value={counts.failed} />
-            <SummaryCount label="Outcome unknown" value={counts.outcome_unknown} />
+            <SummaryCount
+              label="Outcome unknown"
+              value={counts.outcome_unknown}
+            />
           </dl>
         </div>
 
         {refreshFailed ? (
           <div className="border-b border-white/10 px-5 py-4 sm:px-6">
             <Alert className="border-status-warning/20 bg-status-warning/10 text-white">
-              <RefreshCw aria-hidden="true" className={cn(isRefreshing && "animate-spin")} />
+              <RefreshCw
+                aria-hidden="true"
+                className={cn(isRefreshing && "animate-spin")}
+              />
               <AlertTitle>The latest refresh failed</AlertTitle>
               <AlertDescription className="flex flex-col gap-2 text-white/65 sm:flex-row sm:items-center sm:justify-between">
-                <span>The results below are the last confirmed snapshot. Processing may still continue.</span>
-                <Button variant="outline" size="sm" onClick={onRefresh} disabled={isRefreshing}>
+                <span>
+                  The results below are the last confirmed snapshot. Processing
+                  may still continue.
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRefresh}
+                  disabled={isRefreshing}
+                >
                   Refresh now
                 </Button>
               </AlertDescription>
@@ -131,11 +161,16 @@ export function BatchProgress({
               >
                 <div className="min-w-0">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-white">{result.worker_name}</p>
+                    <p className="font-medium text-white">
+                      {result.worker_name}
+                    </p>
                     <Badge className={cn("rounded-full", details.className)}>
                       <StatusIcon
                         aria-hidden="true"
-                        className={cn("size-3", result.status === "pending" && "animate-spin")}
+                        className={cn(
+                          "size-3",
+                          result.status === "pending" && "animate-spin",
+                        )}
                       />
                       {details.label}
                     </Badge>
@@ -163,7 +198,9 @@ export function BatchProgress({
                     </p>
                   ) : null}
                   {result.error_message ? (
-                    <p className="mt-2 text-sm text-white/65">{result.error_message}</p>
+                    <p className="mt-2 text-sm text-white/65">
+                      {result.error_message}
+                    </p>
                   ) : null}
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
@@ -182,9 +219,14 @@ export function BatchProgress({
                     >
                       <RotateCcw
                         aria-hidden="true"
-                        className={cn(retryingWorkerID === result.worker_id && "animate-spin")}
+                        className={cn(
+                          retryingWorkerID === result.worker_id &&
+                            "animate-spin",
+                        )}
                       />
-                      {retryingWorkerID === result.worker_id ? "Preparing…" : "Prepare retry"}
+                      {retryingWorkerID === result.worker_id
+                        ? "Preparing…"
+                        : "Prepare retry"}
                     </Button>
                   ) : null}
                 </div>
@@ -201,7 +243,9 @@ function SummaryCount({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
       <dt className="text-[0.7rem] text-white/45">{label}</dt>
-      <dd className="mt-1 text-xl font-semibold text-white tabular-nums">{value}</dd>
+      <dd className="mt-1 text-xl font-semibold text-white tabular-nums">
+        {value}
+      </dd>
     </div>
   );
 }

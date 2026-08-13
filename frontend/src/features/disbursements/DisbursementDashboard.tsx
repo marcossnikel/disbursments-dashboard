@@ -21,13 +21,17 @@ import {
 export function DisbursementDashboard() {
   const workersQuery = useQuery(workersQueryOptions());
   const queryClient = useQueryClient();
-  const [selectedWorkerIDs, setSelectedWorkerIDs] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
+  const [selectedWorkerIDs, setSelectedWorkerIDs] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   const [isConfirmationOpen, setConfirmationOpen] = useState(false);
-  const [activeBatchID, setActiveBatchID] = useState<string | null>(readBatchIDFromURL);
+  const [activeBatchID, setActiveBatchID] = useState<string | null>(
+    readBatchIDFromURL,
+  );
   const [retryingWorkerID, setRetryingWorkerID] = useState<string | null>(null);
-  const [retryPreparationError, setRetryPreparationError] = useState<string | null>(null);
+  const [retryPreparationError, setRetryPreparationError] = useState<
+    string | null
+  >(null);
   const batchQuery = useQuery(batchQueryOptions(activeBatchID));
   const submitBatchMutation = useMutation({
     mutationFn: submitBatch,
@@ -46,12 +50,22 @@ export function DisbursementDashboard() {
 
   if (workersQuery.isError) {
     return (
-      <Alert variant="destructive" className="border-status-danger/15 bg-status-danger-soft">
+      <Alert
+        variant="destructive"
+        className="border-status-danger/15 bg-status-danger-soft"
+      >
         <AlertCircle aria-hidden="true" />
         <AlertTitle>We couldn't load pending disbursements</AlertTitle>
         <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span>Check that the API is running, then try again. Your selection has not changed.</span>
-          <Button variant="outline" size="sm" onClick={() => void workersQuery.refetch()}>
+          <span>
+            Check that the API is running, then try again. Your selection has
+            not changed.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void workersQuery.refetch()}
+          >
             <RefreshCw aria-hidden="true" />
             Try again
           </Button>
@@ -61,7 +75,9 @@ export function DisbursementDashboard() {
   }
 
   const workers = workersQuery.data;
-  const selectedWorkers = workers.filter((worker) => selectedWorkerIDs.has(worker.id));
+  const selectedWorkers = workers.filter((worker) =>
+    selectedWorkerIDs.has(worker.id),
+  );
 
   function toggleWorker(workerID: string) {
     setSelectedWorkerIDs((currentSelection) => {
@@ -83,7 +99,9 @@ export function DisbursementDashboard() {
   }
 
   const submissionError =
-    submitBatchMutation.error instanceof ApiError ? submitBatchMutation.error : undefined;
+    submitBatchMutation.error instanceof ApiError
+      ? submitBatchMutation.error
+      : undefined;
   const unavailableWorkers =
     submissionError?.details?.code === "workers_unavailable"
       ? submissionError.details.unavailable_workers
@@ -127,7 +145,9 @@ export function DisbursementDashboard() {
         );
         return;
       }
-      const workerIsAvailable = refreshedWorkers.data?.some((worker) => worker.id === workerID);
+      const workerIsAvailable = refreshedWorkers.data?.some(
+        (worker) => worker.id === workerID,
+      );
       if (!workerIsAvailable) {
         setRetryPreparationError(
           "This worker is no longer available for a new batch. Review the original payment before taking another action.",
@@ -159,14 +179,26 @@ export function DisbursementDashboard() {
           onPrepareRetry={(workerID) => void prepareRetry(workerID)}
         />
       ) : null}
-      {activeBatchID !== null && batchQuery.isPending ? <BatchLoadingState /> : null}
+      {activeBatchID !== null && batchQuery.isPending ? (
+        <BatchLoadingState />
+      ) : null}
       {activeBatchID !== null && batchQuery.isError && !batchQuery.data ? (
-        <Alert variant="destructive" className="mb-6 border-status-danger/15 bg-status-danger-soft">
+        <Alert
+          variant="destructive"
+          className="mb-6 border-status-danger/15 bg-status-danger-soft"
+        >
           <AlertCircle aria-hidden="true" />
           <AlertTitle>We couldn't load batch {activeBatchID}</AlertTitle>
           <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span>The batch may still be processing. Retry without creating another batch.</span>
-            <Button variant="outline" size="sm" onClick={() => void batchQuery.refetch()}>
+            <span>
+              The batch may still be processing. Retry without creating another
+              batch.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void batchQuery.refetch()}
+            >
               <RefreshCw aria-hidden="true" />
               Retry status
             </Button>
@@ -185,7 +217,8 @@ export function DisbursementDashboard() {
           <CardContent>
             <p className="text-lg font-semibold">No pending disbursements</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Every available worker obligation has already been processed or reserved.
+              Every available worker obligation has already been processed or
+              reserved.
             </p>
           </CardContent>
         </Card>
@@ -233,10 +266,15 @@ function BatchLoadingState() {
     <Card className="mb-6 border-0 bg-secondary text-secondary-foreground shadow-xl">
       <CardContent className="p-6">
         <div className="flex items-center gap-3">
-          <RefreshCw aria-hidden="true" className="size-4 animate-spin text-primary" />
+          <RefreshCw
+            aria-hidden="true"
+            className="size-4 animate-spin text-primary"
+          />
           <div>
             <p className="font-medium">Opening the accepted batch…</p>
-            <p className="text-sm text-white/50">Pending results will appear here immediately.</p>
+            <p className="text-sm text-white/50">
+              Pending results will appear here immediately.
+            </p>
           </div>
         </div>
       </CardContent>

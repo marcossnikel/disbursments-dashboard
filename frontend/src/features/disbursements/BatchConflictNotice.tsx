@@ -30,17 +30,23 @@ export function BatchConflictNotice({
         <ShieldAlert aria-hidden="true" className="text-status-warning" />
         <AlertTitle>No disbursements were started</AlertTitle>
         <AlertDescription className="text-muted-foreground">
-          The batch changed before confirmation. We stopped the entire request so the selected
-          workers were never silently changed.
+          The batch changed before confirmation. We stopped the entire request
+          so the selected workers were never silently changed.
         </AlertDescription>
       </Alert>
 
       <div className="mt-4 space-y-3">
         {unavailableWorkers.map((worker) => (
-          <div key={worker.worker_id} className="rounded-xl border bg-muted/45 p-3">
+          <div
+            key={worker.worker_id}
+            className="rounded-xl border bg-muted/45 p-3"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold">{reasonMessage(worker)}</p>
-              <Badge variant="outline" className="rounded-full font-mono text-[0.65rem]">
+              <Badge
+                variant="outline"
+                className="rounded-full font-mono text-[0.65rem]"
+              >
                 {worker.reason}
               </Badge>
             </div>
@@ -58,7 +64,9 @@ export function BatchConflictNotice({
           ? "You can return with the available workers selected, then review the revised batch again before anything starts."
           : "No workers from this selection are currently available for another batch."}
       </p>
-      {requestID ? <p className="mt-2 font-mono text-xs">Request {requestID}</p> : null}
+      {requestID ? (
+        <p className="mt-2 font-mono text-xs">Request {requestID}</p>
+      ) : null}
 
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="ghost" onClick={onCancel}>
@@ -70,7 +78,8 @@ export function BatchConflictNotice({
         </Button>
         {availableWorkerCount > 0 ? (
           <Button onClick={onContinueWithAvailableWorkers}>
-            Continue with {availableWorkerCount} available {availableWorkerCount === 1 ? "worker" : "workers"}
+            Continue with {availableWorkerCount} available{" "}
+            {availableWorkerCount === 1 ? "worker" : "workers"}
             <ArrowRight aria-hidden="true" />
           </Button>
         ) : null}

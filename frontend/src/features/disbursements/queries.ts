@@ -59,9 +59,12 @@ async function listWorkers(): Promise<Worker[]> {
 }
 
 async function getBatch(batchID: string): Promise<BatchSnapshot> {
-  const { data, error, response } = await apiClient.GET("/disbursements/{batch_id}", {
-    params: { path: { batch_id: batchID } },
-  });
+  const { data, error, response } = await apiClient.GET(
+    "/disbursements/{batch_id}",
+    {
+      params: { path: { batch_id: batchID } },
+    },
+  );
   if (!response.ok || !data) {
     throw apiError(response, error);
   }

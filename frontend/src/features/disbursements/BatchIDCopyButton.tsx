@@ -48,7 +48,10 @@ export function BatchIDCopyButton({ batchID }: BatchIDCopyButtonProps) {
           transition={{ duration: 0.15 }}
         >
           {isCopied ? (
-            <Check aria-hidden="true" className="size-3.5 text-status-success" />
+            <Check
+              aria-hidden="true"
+              className="size-3.5 text-status-success"
+            />
           ) : (
             <Copy aria-hidden="true" className="size-3.5" />
           )}

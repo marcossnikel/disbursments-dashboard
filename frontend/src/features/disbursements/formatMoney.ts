@@ -9,15 +9,23 @@ export function formatMoney(amount: string, currency: Currency): string {
   return formatMinorUnits(parseMinorUnits(amount), currency);
 }
 
-export function totalsByCurrency(workers: readonly Worker[]): Map<Currency, bigint> {
+export function totalsByCurrency(
+  workers: readonly Worker[],
+): Map<Currency, bigint> {
   const totals = new Map<Currency, bigint>();
   for (const worker of workers) {
-    totals.set(worker.currency, (totals.get(worker.currency) ?? 0n) + parseMinorUnits(worker.amount));
+    totals.set(
+      worker.currency,
+      (totals.get(worker.currency) ?? 0n) + parseMinorUnits(worker.amount),
+    );
   }
   return totals;
 }
 
-export function formatMinorUnits(minorUnits: bigint, currency: Currency): string {
+export function formatMinorUnits(
+  minorUnits: bigint,
+  currency: Currency,
+): string {
   const majorUnits = minorUnits / 100n;
   const fractionalUnits = (minorUnits % 100n).toString().padStart(2, "0");
   const majorAmount = new Intl.NumberFormat("en-US", {

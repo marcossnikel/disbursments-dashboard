@@ -31,12 +31,20 @@ describe("DisbursementDashboard", () => {
 
     renderDashboard();
 
-    expect(screen.getByText("Loading pending disbursements…")).toBeInTheDocument();
+    expect(
+      screen.getByText("Loading pending disbursements…"),
+    ).toBeInTheDocument();
     await screen.findByText("Ada Lovelace");
 
-    await user.click(screen.getByRole("checkbox", { name: "Select Ada Lovelace" }));
-    await user.click(screen.getByRole("checkbox", { name: "Select Linus Torvalds" }));
-    await user.click(screen.getByRole("button", { name: "Disburse 2 workers" }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Ada Lovelace" }),
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Linus Torvalds" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Disburse 2 workers" }),
+    );
 
     const dialog = screen.getByRole("dialog", { name: "Confirm this batch" });
     expect(within(dialog).getByText("Ada Lovelace")).toBeInTheDocument();
@@ -61,7 +69,10 @@ describe("DisbursementDashboard", () => {
           const body = (await request.json()) as { batch_id: string };
           return jsonResponse({ batch_id: body.batch_id }, { status: 202 });
         }
-        if (request.method === "GET" && url.pathname.startsWith("/disbursements/")) {
+        if (
+          request.method === "GET" &&
+          url.pathname.startsWith("/disbursements/")
+        ) {
           batchReadCount++;
           const batchID = url.pathname.replace("/disbursements/", "");
           return jsonResponse(
@@ -104,13 +115,21 @@ describe("DisbursementDashboard", () => {
 
     renderDashboard();
     await screen.findByText("Ada Lovelace");
-    await user.click(screen.getByRole("checkbox", { name: "Select Ada Lovelace" }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Ada Lovelace" }),
+    );
     await user.click(screen.getByRole("button", { name: "Disburse 1 worker" }));
-    await user.click(screen.getByRole("button", { name: "Confirm and disburse" }));
+    await user.click(
+      screen.getByRole("button", { name: "Confirm and disburse" }),
+    );
 
     expect(await screen.findByText("Pending")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy batch ID" })).toBeInTheDocument();
-    expect(await screen.findByText("Success", {}, { timeout: 2_000 })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy batch ID" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("Success", {}, { timeout: 2_000 }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Provider ptx-001")).toBeInTheDocument();
     expect(screen.getByText("1", { selector: "dd" })).toBeInTheDocument();
   });
@@ -149,7 +168,9 @@ describe("DisbursementDashboard", () => {
 
     expect(await screen.findByText("Batch complete")).toBeInTheDocument();
     expect(screen.getByText("Provider ptx-restored")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Confirm and disburse/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Confirm and disburse/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("explains an unavailable worker and requires a fresh confirmation for the remainder", async () => {
@@ -164,7 +185,8 @@ describe("DisbursementDashboard", () => {
           return jsonResponse(
             {
               code: "workers_unavailable",
-              message: "No disbursements were started. One or more workers are no longer available.",
+              message:
+                "No disbursements were started. One or more workers are no longer available.",
               request_id: "req-conflict",
               unavailable_workers: [
                 {
@@ -186,24 +208,46 @@ describe("DisbursementDashboard", () => {
 
     renderDashboard();
     await screen.findByText("Ada Lovelace");
-    await user.click(screen.getByRole("checkbox", { name: "Select Ada Lovelace" }));
-    await user.click(screen.getByRole("checkbox", { name: "Select Linus Torvalds" }));
-    await user.click(screen.getByRole("button", { name: "Disburse 2 workers" }));
-    await user.click(screen.getByRole("button", { name: "Confirm and disburse" }));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Ada Lovelace" }),
+    );
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Linus Torvalds" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Disburse 2 workers" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Confirm and disburse" }),
+    );
 
-    expect(await screen.findByText("No disbursements were started")).toBeInTheDocument();
-    expect(screen.getByText("Ada Lovelace was already paid.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No disbursements were started"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Ada Lovelace was already paid."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Batch batch-paid")).toBeInTheDocument();
     expect(screen.getByText("Request req-conflict")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Continue with 1 available worker" }));
+    await user.click(
+      screen.getByRole("button", { name: "Continue with 1 available worker" }),
+    );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Disburse 1 worker" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Disburse 1 worker" }),
+    ).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Disburse 1 worker" }));
-    const revisedDialog = screen.getByRole("dialog", { name: "Confirm this batch" });
-    expect(within(revisedDialog).getByText("Linus Torvalds")).toBeInTheDocument();
-    expect(within(revisedDialog).queryByText("Ada Lovelace")).not.toBeInTheDocument();
+    const revisedDialog = screen.getByRole("dialog", {
+      name: "Confirm this batch",
+    });
+    expect(
+      within(revisedDialog).getByText("Linus Torvalds"),
+    ).toBeInTheDocument();
+    expect(
+      within(revisedDialog).queryByText("Ada Lovelace"),
+    ).not.toBeInTheDocument();
   });
 
   it("prepares a fresh confirmation only for a confirmed failure", async () => {
@@ -236,7 +280,8 @@ describe("DisbursementDashboard", () => {
                 amount: "2300.00",
                 currency: "EUR",
                 status: "outcome_unknown",
-                error_message: "Provider timed out before confirming the result.",
+                error_message:
+                  "Provider timed out before confirming the result.",
               },
             ],
           });
@@ -248,16 +293,26 @@ describe("DisbursementDashboard", () => {
 
     renderDashboard();
 
-    expect(await screen.findByText("Payment outcome unknown")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Prepare retry for Linus Torvalds" }),
+      await screen.findByText("Payment outcome unknown"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Prepare retry for Linus Torvalds",
+      }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Prepare retry for Ada Lovelace" }));
+    await user.click(
+      screen.getByRole("button", { name: "Prepare retry for Ada Lovelace" }),
+    );
 
-    const retryDialog = await screen.findByRole("dialog", { name: "Confirm this batch" });
+    const retryDialog = await screen.findByRole("dialog", {
+      name: "Confirm this batch",
+    });
     expect(within(retryDialog).getByText("Ada Lovelace")).toBeInTheDocument();
-    expect(within(retryDialog).queryByText("Linus Torvalds")).not.toBeInTheDocument();
+    expect(
+      within(retryDialog).queryByText("Linus Torvalds"),
+    ).not.toBeInTheDocument();
     expect(
       within(retryDialog).getByRole("button", { name: "Confirm and disburse" }),
     ).toBeEnabled();

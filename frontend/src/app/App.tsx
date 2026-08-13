@@ -17,11 +17,19 @@ export function App() {
             />
             <div>
               <p className="text-sm font-semibold tracking-tight">Cadana</p>
-              <p className="text-xs text-muted-foreground">Disbursement Console</p>
+              <p className="text-xs text-muted-foreground">
+                Disbursement Console
+              </p>
             </div>
           </div>
-          <Badge variant="outline" className="gap-1.5 rounded-full bg-white px-3 py-1">
-            <ShieldCheck aria-hidden="true" className="size-3.5 text-status-success" />
+          <Badge
+            variant="outline"
+            className="gap-1.5 rounded-full bg-white px-3 py-1"
+          >
+            <ShieldCheck
+              aria-hidden="true"
+              className="size-3.5 text-status-success"
+            />
             Internal operations
           </Badge>
         </div>
@@ -34,15 +42,21 @@ export function App() {
           </Badge>
           <h1 className="max-w-3xl text-4xl leading-[0.98] font-semibold tracking-[-0.05em] sm:text-6xl">
             Payroll disbursements,
-            <span className="font-serif font-normal italic text-primary"> made clear.</span>
+            <span className="font-serif font-normal italic text-primary">
+              {" "}
+              made clear.
+            </span>
           </h1>
           <p className="mt-5 max-w-xl text-base leading-7 text-white/65">
-            Select pending workers, confirm one immutable batch, and follow every provider
-            result as it arrives.
+            Select pending workers, confirm one immutable batch, and follow
+            every provider result as it arrives.
           </p>
         </section>
 
-        <section className="relative z-10 -mt-3 px-0 sm:-mt-8 sm:px-6" aria-label="Disbursements">
+        <section
+          className="relative z-10 -mt-3 px-0 sm:-mt-8 sm:px-6"
+          aria-label="Disbursements"
+        >
           <DisbursementDashboard />
         </section>
       </main>

@@ -38,7 +38,9 @@ export function WorkerSelection({
             <UsersRound aria-hidden="true" className="size-4" />
             Pending disbursements
           </div>
-          <CardTitle className="text-xl tracking-tight">Choose workers for this batch</CardTitle>
+          <CardTitle className="text-xl tracking-tight">
+            Choose workers for this batch
+          </CardTitle>
         </div>
         <Badge variant="secondary" className="w-fit rounded-full px-3 py-1">
           {workers.length} available
@@ -56,14 +58,19 @@ export function WorkerSelection({
                 <TableHead>Worker</TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>Currency</TableHead>
-                <TableHead className="pr-5 text-right sm:pr-6">Amount</TableHead>
+                <TableHead className="pr-5 text-right sm:pr-6">
+                  Amount
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {workers.map((worker) => {
                 const isSelected = selectedWorkerIDs.has(worker.id);
                 return (
-                  <TableRow key={worker.id} data-state={isSelected ? "selected" : undefined}>
+                  <TableRow
+                    key={worker.id}
+                    data-state={isSelected ? "selected" : undefined}
+                  >
                     <TableCell className="pl-5 sm:pl-6">
                       <Checkbox
                         id={`worker-${worker.id}`}
@@ -73,7 +80,10 @@ export function WorkerSelection({
                       />
                     </TableCell>
                     <TableCell>
-                      <label htmlFor={`worker-${worker.id}`} className="block cursor-pointer">
+                      <label
+                        htmlFor={`worker-${worker.id}`}
+                        className="block cursor-pointer"
+                      >
                         <span className="block font-medium">{worker.name}</span>
                         <span className="block text-xs text-muted-foreground sm:hidden">
                           {worker.id}
@@ -84,7 +94,10 @@ export function WorkerSelection({
                       {worker.id}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="rounded-full font-mono text-[0.7rem]">
+                      <Badge
+                        variant="outline"
+                        className="rounded-full font-mono text-[0.7rem]"
+                      >
                         {worker.currency}
                       </Badge>
                     </TableCell>
@@ -100,7 +113,10 @@ export function WorkerSelection({
 
         <div className="flex flex-col gap-4 border-t bg-muted/35 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CircleDollarSign aria-hidden="true" className="size-4 text-primary" />
+            <CircleDollarSign
+              aria-hidden="true"
+              className="size-4 text-primary"
+            />
             {selectedCount === 0
               ? "Select at least one worker to continue."
               : `${selectedCount} ${selectedCount === 1 ? "worker" : "workers"} selected`}

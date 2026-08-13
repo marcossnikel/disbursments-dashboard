@@ -4,7 +4,9 @@ import type { components, paths } from "@/api/generated/schema";
 
 type ErrorResponse = components["schemas"]["ErrorResponse"];
 
-const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
+const baseUrl = (
+  import.meta.env.VITE_API_URL ?? "http://localhost:8080"
+).replace(/\/$/, "");
 
 export const apiClient = createClient<paths>({
   baseUrl,
@@ -18,10 +20,14 @@ export class ApiError extends Error {
 
   constructor(response: Response, body: unknown) {
     const details = isErrorResponse(body) ? body : undefined;
-    super(details?.message ?? `The API request failed with status ${response.status}.`);
+    super(
+      details?.message ??
+        `The API request failed with status ${response.status}.`,
+    );
     this.name = "ApiError";
     this.status = response.status;
-    this.requestID = details?.request_id ?? response.headers.get("X-Request-ID") ?? undefined;
+    this.requestID =
+      details?.request_id ?? response.headers.get("X-Request-ID") ?? undefined;
     this.details = details;
   }
 }
