@@ -2,6 +2,7 @@ import { ShieldCheck } from "lucide-react";
 
 import cadanaLogo from "@/assets/cadana-logo.jpeg";
 import { Badge } from "@/components/ui/badge";
+import { DisbursementDashboard } from "@/features/disbursements/DisbursementDashboard";
 
 export function App() {
   return (
@@ -26,7 +27,7 @@ export function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <section className="overflow-hidden rounded-3xl bg-secondary px-6 py-10 text-secondary-foreground shadow-2xl shadow-black/10 sm:px-10 sm:py-14">
           <Badge className="mb-5 rounded-full bg-primary/15 px-3 py-1 text-primary hover:bg-primary/15">
             Payment operations
@@ -39,6 +40,10 @@ export function App() {
             Select pending workers, confirm one immutable batch, and follow every provider
             result as it arrives.
           </p>
+        </section>
+
+        <section className="relative z-10 -mt-3 px-0 sm:-mt-8 sm:px-6" aria-label="Disbursements">
+          <DisbursementDashboard />
         </section>
       </main>
     </div>
