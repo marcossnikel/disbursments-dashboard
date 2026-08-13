@@ -1,43 +1,123 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/instrument-sans";
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  color: #0c0c0d;
-  background: #f4f6f7;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color-scheme: light;
+  font-family: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  --background: #f4f6f7;
+  --foreground: #0c0c0d;
+  --card: #ffffff;
+  --card-foreground: #0c0c0d;
+  --popover: #ffffff;
+  --popover-foreground: #0c0c0d;
+  --primary: #e75423;
+  --primary-foreground: #ffffff;
+  --secondary: #131315;
+  --secondary-foreground: #ffffff;
+  --muted: #f4f6f7;
+  --muted-foreground: #646872;
+  --accent: #fdefe9;
+  --accent-foreground: #9d3210;
+  --destructive: #c9362b;
+  --border: #e1e4e6;
+  --input: #d5d9dc;
+  --ring: #e75423;
+  --chart-1: #e75423;
+  --chart-2: #20976c;
+  --chart-3: #e0a429;
+  --chart-4: #6380d8;
+  --chart-5: #92969f;
+  --status-success: #167756;
+  --status-success-soft: #e8f7f0;
+  --status-warning: #9a6700;
+  --status-warning-soft: #fff6dd;
+  --status-danger: #b62f26;
+  --status-danger-soft: #fff0ee;
+  --status-info: #4564bd;
+  --status-info-soft: #edf1ff;
+  --radius: 0.75rem;
 }
 
-* {
-  box-sizing: border-box;
+@theme inline {
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-status-success: var(--status-success);
+  --color-status-success-soft: var(--status-success-soft);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-soft: var(--status-warning-soft);
+  --color-status-danger: var(--status-danger);
+  --color-status-danger-soft: var(--status-danger-soft);
+  --color-status-info: var(--status-info);
+  --color-status-info-soft: var(--status-info-soft);
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: calc(var(--radius) * 0.875);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 2);
+  --radius-3xl: calc(var(--radius) * 2.5);
 }
 
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  margin: 0;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply min-h-screen min-w-80 bg-background text-foreground antialiased;
+    margin: 0;
+    background-image:
+      radial-gradient(circle at 8% 0%, rgb(231 84 35 / 8%), transparent 28rem),
+      linear-gradient(180deg, #ffffff 0, #f4f6f7 28rem);
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
-.app-shell {
-  width: min(720px, calc(100% - 32px));
-  margin: 80px auto;
-  padding: 40px;
-  border-radius: 16px;
-  background: #ffffff;
-}
-
-.eyebrow {
-  color: #e75423;
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-h1 {
-  margin: 12px 0;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  letter-spacing: -0.04em;
-}
-
-p {
-  line-height: 1.6;
+::selection {
+  color: #ffffff;
+  background: #e75423;
 }
