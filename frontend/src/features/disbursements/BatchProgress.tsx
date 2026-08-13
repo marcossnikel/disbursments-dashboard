@@ -109,6 +109,7 @@ export function BatchProgress({
             </div>
             <Progress
               value={completionPercentage}
+              aria-label="Batch completion"
               className="h-1.5 bg-white/10"
             />
           </div>
@@ -188,7 +189,7 @@ export function BatchProgress({
                       <TooltipContent>{details.description}</TooltipContent>
                     </Tooltip>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.7rem] text-white/40">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.7rem] text-white/55">
                     <span>Worker {result.worker_id}</span>
                     <span>Disbursement {result.disbursement_id}</span>
                   </div>
@@ -207,7 +208,7 @@ export function BatchProgress({
                   <p className="font-semibold text-white tabular-nums">
                     {formatMoney(result.amount, result.currency)}
                   </p>
-                  <p className="text-xs text-white/40">{result.currency}</p>
+                  <p className="text-xs text-white/55">{result.currency}</p>
                   {result.status === "failed" ? (
                     <Button
                       variant="outline"
@@ -242,7 +243,7 @@ export function BatchProgress({
 function SummaryCount({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
-      <dt className="text-[0.7rem] text-white/45">{label}</dt>
+      <dt className="text-[0.7rem] text-white/60">{label}</dt>
       <dd className="mt-1 text-xl font-semibold text-white tabular-nums">
         {value}
       </dd>

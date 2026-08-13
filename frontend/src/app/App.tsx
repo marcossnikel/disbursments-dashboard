@@ -37,7 +37,7 @@ export function App() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
         <section className="overflow-hidden rounded-3xl bg-secondary px-6 py-10 text-secondary-foreground shadow-2xl shadow-black/10 sm:px-10 sm:py-14">
-          <Badge className="mb-5 rounded-full bg-primary/15 px-3 py-1 text-primary hover:bg-primary/15">
+          <Badge className="mb-5 rounded-full bg-primary/15 px-3 py-1 text-[#ff7047] hover:bg-primary/15">
             Payment operations
           </Badge>
           <h1 className="max-w-3xl text-4xl leading-[0.98] font-semibold tracking-[-0.05em] sm:text-6xl">

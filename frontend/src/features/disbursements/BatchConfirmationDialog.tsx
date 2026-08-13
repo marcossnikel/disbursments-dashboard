@@ -63,7 +63,7 @@ export function BatchConfirmationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[min(42rem,calc(100vh-2rem))] gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogHeader className="border-b px-6 py-5">
-          <div className="mb-1 flex items-center gap-2 text-primary">
+          <div className="mb-1 flex items-center gap-2 text-[#b93613]">
             <ShieldCheck aria-hidden="true" className="size-4" />
             <span className="text-xs font-semibold tracking-[0.12em] uppercase">
               Final review

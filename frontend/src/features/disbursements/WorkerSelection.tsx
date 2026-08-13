@@ -34,7 +34,7 @@ export function WorkerSelection({
     <Card className="overflow-hidden border-black/5 shadow-xl shadow-black/5">
       <CardHeader className="gap-3 border-b bg-white px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-[#b93613]">
             <UsersRound aria-hidden="true" className="size-4" />
             Pending disbursements
           </div>
@@ -115,7 +115,7 @@ export function WorkerSelection({
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <CircleDollarSign
               aria-hidden="true"
-              className="size-4 text-primary"
+              className="size-4 text-[#b93613]"
             />
             {selectedCount === 0
               ? "Select at least one worker to continue."
