@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/disbursement"
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/openapi"
@@ -29,6 +30,11 @@ type Server struct {
 var ErrInvalidServer = errors.New("invalid HTTP server")
 
 type requestIDContextKey struct{}
+
+type responseRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
 
 func New(processor *disbursement.Processor, logger *slog.Logger, config Config) (*Server, error) {
 	if processor == nil {
@@ -55,22 +61,26 @@ func New(processor *disbursement.Processor, logger *slog.Logger, config Config) 
 }
 
 func (s *Server) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
+	requestStartedAt := time.Now()
 	requestID := "req-" + strings.ToLower(rand.Text())
-	responseWriter.Header().Set("X-Request-ID", requestID)
 	request = request.WithContext(context.WithValue(request.Context(), requestIDContextKey{}, requestID))
+	recordedResponse := &responseRecorder{ResponseWriter: responseWriter}
+	defer s.logRequest(request, recordedResponse, requestStartedAt)
+
+	recordedResponse.Header().Set("X-Request-ID", requestID)
 
 	if request.Header.Get("Origin") == s.allowedOrigin {
-		responseWriter.Header().Set("Access-Control-Allow-Origin", s.allowedOrigin)
-		responseWriter.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		responseWriter.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		responseWriter.Header().Add("Vary", "Origin")
+		recordedResponse.Header().Set("Access-Control-Allow-Origin", s.allowedOrigin)
+		recordedResponse.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		recordedResponse.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		recordedResponse.Header().Add("Vary", "Origin")
 		if request.Method == http.MethodOptions {
-			responseWriter.WriteHeader(http.StatusNoContent)
+			recordedResponse.WriteHeader(http.StatusNoContent)
 			return
 		}
 	}
 
-	s.mux.ServeHTTP(responseWriter, request)
+	s.mux.ServeHTTP(recordedResponse, request)
 }
 
 func (s *Server) listWorkers(responseWriter http.ResponseWriter, _ *http.Request) {
@@ -116,9 +126,58 @@ func (s *Server) submitDisbursements(responseWriter http.ResponseWriter, request
 	if !submission.Created {
 		statusCode = http.StatusOK
 	}
+	s.logger.Info(
+		"disbursement submission handled",
+		"request_id", requestIDFrom(request),
+		"batch_id", submission.BatchID,
+		"created", submission.Created,
+	)
 	s.writeJSON(responseWriter, statusCode, openapi.SubmitBatchResponse{
 		BatchId: string(submission.BatchID),
 	})
+}
+
+func (s *Server) logRequest(
+	request *http.Request,
+	response *responseRecorder,
+	startedAt time.Time,
+) {
+	statusCode := response.statusCode
+	if statusCode == 0 {
+		statusCode = http.StatusOK
+	}
+	level := slog.LevelInfo
+	if statusCode >= http.StatusInternalServerError {
+		level = slog.LevelError
+	} else if statusCode >= http.StatusBadRequest {
+		level = slog.LevelWarn
+	}
+
+	s.logger.Log(
+		request.Context(),
+		level,
+		"HTTP request completed",
+		"request_id", requestIDFrom(request),
+		"method", request.Method,
+		"path", request.URL.Path,
+		"status", statusCode,
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+	)
+}
+
+func (r *responseRecorder) WriteHeader(statusCode int) {
+	if r.statusCode != 0 {
+		return
+	}
+	r.statusCode = statusCode
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *responseRecorder) Write(body []byte) (int, error) {
+	if r.statusCode == 0 {
+		r.WriteHeader(http.StatusOK)
+	}
+	return r.ResponseWriter.Write(body)
 }
 
 func (s *Server) getDisbursementBatch(responseWriter http.ResponseWriter, request *http.Request) {

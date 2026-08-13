@@ -35,9 +35,10 @@ func TestServerListsAvailableWorkersWithARequestID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
+	var logOutput bytes.Buffer
 	handler, err := httpserver.New(
 		processor,
-		slog.New(slog.DiscardHandler),
+		slog.New(slog.NewJSONHandler(&logOutput, nil)),
 		httpserver.Config{AllowedOrigin: "http://localhost:5173"},
 	)
 	if err != nil {
@@ -55,7 +56,8 @@ func TestServerListsAvailableWorkersWithARequestID(t *testing.T) {
 	if got, want := response.StatusCode, http.StatusOK; got != want {
 		t.Fatalf("GET /workers status = %d, want %d", got, want)
 	}
-	if requestID := response.Header.Get("X-Request-ID"); !strings.HasPrefix(requestID, "req-") {
+	requestID := response.Header.Get("X-Request-ID")
+	if !strings.HasPrefix(requestID, "req-") {
 		t.Errorf("X-Request-ID = %q, want req- prefix", requestID)
 	}
 	if got, want := response.Header.Get("Content-Type"), "application/json"; got != want {
@@ -74,6 +76,19 @@ func TestServerListsAvailableWorkersWithARequestID(t *testing.T) {
 	}
 	if got, want := responseWorkers[0].Currency, openapi.USD; got != want {
 		t.Errorf("first worker currency = %q, want %q", got, want)
+	}
+
+	logLine := logOutput.String()
+	for _, expected := range []string{
+		`"msg":"HTTP request completed"`,
+		`"request_id":"` + requestID + `"`,
+		`"method":"GET"`,
+		`"path":"/workers"`,
+		`"status":200`,
+	} {
+		if !strings.Contains(logLine, expected) {
+			t.Errorf("access log = %q, want to contain %q", logLine, expected)
+		}
 	}
 }
 
