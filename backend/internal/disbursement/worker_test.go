@@ -1,7 +1,9 @@
 package disbursement_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/disbursement"
 )
@@ -13,7 +15,14 @@ func TestProcessorListsSeededWorkersWithExactMoney(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SeedWorkers() error = %v", err)
 	}
-	processor, err := disbursement.NewProcessor(workers)
+	processor, err := disbursement.NewProcessor(
+		context.Background(),
+		workers,
+		disbursement.ProcessorConfig{
+			Provider:        unusedProvider{},
+			ProviderTimeout: time.Second,
+		},
+	)
 	if err != nil {
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
@@ -41,4 +50,13 @@ func TestProcessorListsSeededWorkersWithExactMoney(t *testing.T) {
 	if currencyCounts[disbursement.USD] == 0 || currencyCounts[disbursement.EUR] == 0 {
 		t.Fatalf("seed currencies = %v, want both USD and EUR", currencyCounts)
 	}
+}
+
+type unusedProvider struct{}
+
+func (unusedProvider) Pay(
+	context.Context,
+	disbursement.PaymentRequest,
+) (disbursement.PaymentResult, error) {
+	panic("unusedProvider.Pay was called")
 }
