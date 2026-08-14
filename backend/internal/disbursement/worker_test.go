@@ -33,7 +33,7 @@ func TestProcessorListsSeededWorkersWithExactMoney(t *testing.T) {
 	}
 
 	firstWorker := availableWorkers[0]
-	if got, want := firstWorker.ID(), disbursement.WorkerID("wrk_001"); got != want {
+	if got, want := firstWorker.ID(), disbursement.WorkerID("w-001"); got != want {
 		t.Errorf("first worker ID = %q, want %q", got, want)
 	}
 	if got, want := firstWorker.Name(), "Maya Thompson"; got != want {

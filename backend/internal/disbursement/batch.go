@@ -14,19 +14,19 @@ const (
 	BatchCompleted  BatchStatus = "completed"
 )
 
-type Status string
+type DisbursementStatus string
 
 const (
-	StatusPending        Status = "pending"
-	StatusSuccess        Status = "success"
-	StatusFailed         Status = "failed"
-	StatusOutcomeUnknown Status = "outcome_unknown"
+	StatusPending        DisbursementStatus = "pending"
+	StatusSuccess        DisbursementStatus = "success"
+	StatusFailed         DisbursementStatus = "failed"
+	StatusOutcomeUnknown DisbursementStatus = "outcome_unknown"
 )
 
-type Result struct {
+type DisbursementResult struct {
 	DisbursementID        DisbursementID
 	Worker                Worker
-	Status                Status
+	Status                DisbursementStatus
 	ProviderTransactionID ProviderTransactionID
 	ErrorCode             ProviderErrorCode
 	ErrorMessage          string
@@ -35,7 +35,7 @@ type Result struct {
 type BatchSnapshot struct {
 	BatchID BatchID
 	Status  BatchStatus
-	Results []Result
+	Results []DisbursementResult
 }
 
 type Submission struct {

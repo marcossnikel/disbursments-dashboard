@@ -81,7 +81,7 @@ export interface components {
     schemas: {
         /** @example batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475 */
         BatchID: string;
-        /** @example wrk_001 */
+        /** @example w-001 */
         WorkerID: string;
         /** @enum {string} */
         Currency: "USD" | "EUR";
@@ -118,7 +118,7 @@ export interface components {
              * @description Present only when status is success.
              * @example ptx-e41723a4
              */
-            provider_transaction_id?: string;
+            provider_txn_id?: string;
             /** @description Present only when status is failed or outcome_unknown. */
             error_code?: components["schemas"]["ProviderErrorCode"];
             /** @description Present only when status is failed or outcome_unknown. */

@@ -155,7 +155,7 @@ components:
     WorkerID:
       type: string
       minLength: 1
-      example: wrk_001
+      example: w-001
     Currency:
       type: string
       enum: [USD, EUR]
@@ -230,7 +230,7 @@ components:
           $ref: "#/components/schemas/Currency"
         status:
           $ref: "#/components/schemas/DisbursementStatus"
-        provider_transaction_id:
+        provider_txn_id:
           type: string
           description: Present only when status is success.
           example: ptx-e41723a4

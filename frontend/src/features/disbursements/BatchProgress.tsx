@@ -31,7 +31,6 @@ type BatchProgressProps = {
   retryingWorkerID: string | null;
   onPrepareRetry: (workerID: string) => void;
 };
-
 const statusDetails = {
   pending: {
     label: "Pending",
@@ -198,9 +197,9 @@ export function BatchProgress({
                     <span>Worker {result.worker_id}</span>
                     <span>Disbursement {result.disbursement_id}</span>
                   </div>
-                  {result.provider_transaction_id ? (
+                  {result.provider_txn_id ? (
                     <p className="mt-2 font-mono text-xs text-white/65">
-                      Provider {result.provider_transaction_id}
+                      Provider {result.provider_txn_id}
                     </p>
                   ) : null}
                   {result.error_message ? (

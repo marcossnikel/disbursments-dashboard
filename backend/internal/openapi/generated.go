@@ -166,13 +166,13 @@ type DisbursementResult struct {
 	// ErrorMessage Present only when status is failed or outcome_unknown.
 	ErrorMessage *string `json:"error_message,omitempty"`
 
-	// ProviderTransactionId Present only when status is success.
+	// ProviderTxnId Present only when status is success.
 	//
 	// Example: ptx-e41723a4
-	ProviderTransactionId *string            `json:"provider_transaction_id,omitempty"`
-	Status                DisbursementStatus `json:"status"`
+	ProviderTxnId *string            `json:"provider_txn_id,omitempty"`
+	Status        DisbursementStatus `json:"status"`
 
-	// WorkerId Example: wrk_001
+	// WorkerId Example: w-001
 	WorkerId   WorkerID `json:"worker_id"`
 	WorkerName string   `json:"worker_name"`
 }
@@ -217,7 +217,7 @@ type UnavailableWorker struct {
 	DisbursementId string            `json:"disbursement_id"`
 	Reason         UnavailableReason `json:"reason"`
 
-	// WorkerId Example: wrk_001
+	// WorkerId Example: w-001
 	WorkerId   WorkerID `json:"worker_id"`
 	WorkerName string   `json:"worker_name"`
 }
@@ -228,14 +228,14 @@ type Worker struct {
 	Amount   string   `json:"amount"`
 	Currency Currency `json:"currency"`
 
-	// Id Example: wrk_001
+	// Id Example: w-001
 	Id WorkerID `json:"id"`
 
 	// Name Example: Maya Thompson
 	Name string `json:"name"`
 }
 
-// WorkerID Example: wrk_001
+// WorkerID Example: w-001
 type WorkerID = string
 
 // BadRequest defines model for BadRequest.

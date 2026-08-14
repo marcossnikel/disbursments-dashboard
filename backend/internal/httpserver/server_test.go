@@ -99,7 +99,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SeedWorkers() error = %v", err)
 	}
-	provider := newGatedProvider("wrk_002")
+	provider := newGatedProvider("w-002")
 	processor, err := disbursement.NewProcessor(
 		context.Background(),
 		workers[:2],
@@ -124,7 +124,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 
 	batchRequest := openapi.SubmitBatchRequest{
 		BatchId:   "batch-http-lifecycle",
-		WorkerIds: []string{"wrk_001", "wrk_002"},
+		WorkerIds: []string{"w-001", "w-002"},
 	}
 	response := postBatch(t, testServer.Client(), testServer.URL, batchRequest)
 	if got, want := response.StatusCode, http.StatusAccepted; got != want {
@@ -161,14 +161,14 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 	for _, result := range completed.Results {
 		resultsByWorker[result.WorkerId] = result
 	}
-	if got, want := resultsByWorker["wrk_001"].Status, openapi.DisbursementStatusSuccess; got != want {
-		t.Errorf("wrk_001 status = %q, want %q", got, want)
+	if got, want := resultsByWorker["w-001"].Status, openapi.DisbursementStatusSuccess; got != want {
+		t.Errorf("w-001 status = %q, want %q", got, want)
 	}
-	if transactionID := resultsByWorker["wrk_001"].ProviderTransactionId; transactionID == nil {
-		t.Error("wrk_001 provider transaction ID = nil, want a value")
+	if transactionID := resultsByWorker["w-001"].ProviderTxnId; transactionID == nil {
+		t.Error("w-001 provider transaction ID = nil, want a value")
 	}
-	if got, want := resultsByWorker["wrk_002"].Status, openapi.DisbursementStatusFailed; got != want {
-		t.Errorf("wrk_002 status = %q, want %q", got, want)
+	if got, want := resultsByWorker["w-002"].Status, openapi.DisbursementStatusFailed; got != want {
+		t.Errorf("w-002 status = %q, want %q", got, want)
 	}
 
 	replayResponse := postBatch(t, testServer.Client(), testServer.URL, batchRequest)
@@ -180,7 +180,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 
 	conflictResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
 		BatchId:   batchRequest.BatchId,
-		WorkerIds: []string{"wrk_001"},
+		WorkerIds: []string{"w-001"},
 	})
 	if got, want := conflictResponse.StatusCode, http.StatusConflict; got != want {
 		conflictResponse.Body.Close()
@@ -228,7 +228,7 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 
 	firstResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
 		BatchId:   "batch-paid",
-		WorkerIds: []string{"wrk_001"},
+		WorkerIds: []string{"w-001"},
 	})
 	decodeJSON(t, firstResponse, &openapi.SubmitBatchResponse{})
 	select {
@@ -241,7 +241,7 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 
 	blockedResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
 		BatchId:   "batch-not-started",
-		WorkerIds: []string{"wrk_001", "wrk_002"},
+		WorkerIds: []string{"w-001", "w-002"},
 	})
 	if got, want := blockedResponse.StatusCode, http.StatusConflict; got != want {
 		blockedResponse.Body.Close()
@@ -316,7 +316,7 @@ func TestServerResetsCompletedDemoStateButRejectsAResetDuringProcessing(t *testi
 
 	batchResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
 		BatchId:   "batch-reset-demo",
-		WorkerIds: []string{"wrk_001"},
+		WorkerIds: []string{"w-001"},
 	})
 	decodeJSON(t, batchResponse, &openapi.SubmitBatchResponse{})
 	select {

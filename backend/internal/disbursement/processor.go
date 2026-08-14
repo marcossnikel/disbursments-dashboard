@@ -21,14 +21,16 @@ type Processor struct {
 
 	mu          sync.RWMutex
 	workerOrder []WorkerID
-	obligations map[WorkerID]*obligation
+	obligations map[WorkerID]*paymentObligation
 	batches     map[BatchID]*batch
 	jobs        sync.WaitGroup
 }
 
-var ErrInvalidProcessor = errors.New("invalid processor")
-var ErrInvalidSubmission = errors.New("invalid submission")
-var ErrDemoResetInProgress = errors.New("cannot reset demo while a batch is processing")
+var (
+	ErrInvalidProcessor    = errors.New("invalid processor")
+	ErrInvalidSubmission   = errors.New("invalid submission")
+	ErrDemoResetInProgress = errors.New("cannot reset demo while a batch is processing")
+)
 
 type ProcessorConfig struct {
 	Provider        PaymentProvider
@@ -36,18 +38,19 @@ type ProcessorConfig struct {
 	Logger          *slog.Logger
 }
 
-type obligationStatus uint8
+// paymentObligationStatus prevents the same seeded obligation from being paid twice.
+type paymentObligationStatus uint8
 
 const (
-	obligationAvailable obligationStatus = iota
+	obligationAvailable paymentObligationStatus = iota
 	obligationReserved
 	obligationPaid
-	obligationBlocked
+	obligationOutcomeUnknown
 )
 
-type obligation struct {
+type paymentObligation struct {
 	worker         Worker
-	status         obligationStatus
+	status         paymentObligationStatus
 	batchID        BatchID
 	disbursementID DisbursementID
 }
@@ -56,7 +59,7 @@ type batch struct {
 	id                 BatchID
 	canonicalWorkerIDs []WorkerID
 	resultOrder        []WorkerID
-	results            map[WorkerID]*Result
+	results            map[WorkerID]*DisbursementResult
 	pendingCount       int
 }
 
@@ -65,34 +68,18 @@ func NewProcessor(
 	workers []Worker,
 	config ProcessorConfig,
 ) (*Processor, error) {
-	if applicationContext == nil {
-		return nil, fmt.Errorf("%w: application context is required", ErrInvalidProcessor)
+	if err := validateProcessorConfiguration(applicationContext, workers, config); err != nil {
+		return nil, err
 	}
-	if len(workers) == 0 {
-		return nil, fmt.Errorf("%w: at least one worker is required", ErrInvalidProcessor)
-	}
-	if config.Provider == nil {
-		return nil, fmt.Errorf("%w: payment provider is required", ErrInvalidProcessor)
-	}
-	if config.ProviderTimeout <= 0 {
-		return nil, fmt.Errorf("%w: provider timeout must be positive", ErrInvalidProcessor)
-	}
+
 	logger := config.Logger
 	if logger == nil {
 		logger = slog.New(slog.DiscardHandler)
 	}
 
-	workerOrder := make([]WorkerID, 0, len(workers))
-	obligations := make(map[WorkerID]*obligation, len(workers))
-	for _, worker := range workers {
-		if _, exists := obligations[worker.ID()]; exists {
-			return nil, fmt.Errorf("%w: duplicate worker ID %q", ErrInvalidProcessor, worker.ID())
-		}
-		workerOrder = append(workerOrder, worker.ID())
-		obligations[worker.ID()] = &obligation{
-			worker: worker,
-			status: obligationAvailable,
-		}
+	workerOrder, obligations, err := indexPaymentObligations(workers)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Processor{
@@ -129,8 +116,9 @@ func (p *Processor) Submit(batchID BatchID, workerIDs []WorkerID) (Submission, e
 
 	p.mu.Lock()
 	if existingBatch, exists := p.batches[batchID]; exists {
+		isExactReplay := slices.Equal(existingBatch.canonicalWorkerIDs, canonicalWorkerIDs)
 		p.mu.Unlock()
-		if slices.Equal(existingBatch.canonicalWorkerIDs, canonicalWorkerIDs) {
+		if isExactReplay {
 			p.logger.Info("disbursement batch replayed", "batch_id", batchID)
 			return Submission{BatchID: batchID, Created: false}, nil
 		}
@@ -156,12 +144,12 @@ func (p *Processor) Submit(batchID BatchID, workerIDs []WorkerID) (Submission, e
 		return Submission{}, &WorkersUnavailableError{Workers: unavailableWorkers}
 	}
 
-	results := make(map[WorkerID]*Result, len(workerIDs))
+	results := make(map[WorkerID]*DisbursementResult, len(workerIDs))
 	requests := make([]PaymentRequest, 0, len(workerIDs))
 	for _, workerID := range workerIDs {
 		currentObligation := p.obligations[workerID]
 		disbursementID := DisbursementID(randomID("disb"))
-		result := &Result{
+		result := &DisbursementResult{
 			DisbursementID: disbursementID,
 			Worker:         currentObligation.worker,
 			Status:         StatusPending,
@@ -213,7 +201,7 @@ func (p *Processor) Batch(batchID BatchID) (BatchSnapshot, bool) {
 	if storedBatch.pendingCount == 0 {
 		status = BatchCompleted
 	}
-	results := make([]Result, 0, len(storedBatch.resultOrder))
+	results := make([]DisbursementResult, 0, len(storedBatch.resultOrder))
 	for _, workerID := range storedBatch.resultOrder {
 		results = append(results, *storedBatch.results[workerID])
 	}
@@ -263,7 +251,7 @@ func (p *Processor) unavailableWorkersLocked(workerIDs []WorkerID) []Unavailable
 			reason = AlreadyPending
 		case obligationPaid:
 			reason = AlreadyPaid
-		case obligationBlocked:
+		case obligationOutcomeUnknown:
 			reason = OutcomeUnknown
 		default:
 			continue
@@ -317,7 +305,7 @@ func (p *Processor) processPayment(batchID BatchID, request PaymentRequest) {
 		"disbursement_id", resultSnapshot.DisbursementID,
 		"worker_id", resultSnapshot.Worker.ID(),
 		"status", resultSnapshot.Status,
-		"provider_transaction_id", resultSnapshot.ProviderTransactionID,
+		"provider_txn_id", resultSnapshot.ProviderTransactionID,
 		"error_code", resultSnapshot.ErrorCode,
 	)
 	if completed {
@@ -325,7 +313,11 @@ func (p *Processor) processPayment(batchID BatchID, request PaymentRequest) {
 	}
 }
 
-func (p *Processor) recordFailureLocked(result *Result, currentObligation *obligation, err error) {
+func (p *Processor) recordFailureLocked(
+	result *DisbursementResult,
+	currentObligation *paymentObligation,
+	err error,
+) {
 	var providerFailure *ProviderFailure
 	switch {
 	case errors.As(err, &providerFailure):
@@ -333,7 +325,7 @@ func (p *Processor) recordFailureLocked(result *Result, currentObligation *oblig
 		result.ErrorMessage = providerFailure.Message
 		if providerFailure.OutcomeUnknown || providerFailure.Code == ProviderTimeout {
 			result.Status = StatusOutcomeUnknown
-			currentObligation.status = obligationBlocked
+			currentObligation.status = obligationOutcomeUnknown
 			return
 		}
 		result.Status = StatusFailed
@@ -342,13 +334,49 @@ func (p *Processor) recordFailureLocked(result *Result, currentObligation *oblig
 		result.Status = StatusOutcomeUnknown
 		result.ErrorCode = ProviderTimeout
 		result.ErrorMessage = "the provider did not confirm whether the payment completed"
-		currentObligation.status = obligationBlocked
+		currentObligation.status = obligationOutcomeUnknown
 	default:
 		result.Status = StatusFailed
 		result.ErrorCode = ProviderError
 		result.ErrorMessage = "the provider could not process the payment"
 		currentObligation.status = obligationAvailable
 	}
+}
+
+func validateProcessorConfiguration(
+	applicationContext context.Context,
+	workers []Worker,
+	config ProcessorConfig,
+) error {
+	if applicationContext == nil {
+		return fmt.Errorf("%w: application context is required", ErrInvalidProcessor)
+	}
+	if len(workers) == 0 {
+		return fmt.Errorf("%w: at least one worker is required", ErrInvalidProcessor)
+	}
+	if config.Provider == nil {
+		return fmt.Errorf("%w: payment provider is required", ErrInvalidProcessor)
+	}
+	if config.ProviderTimeout <= 0 {
+		return fmt.Errorf("%w: provider timeout must be positive", ErrInvalidProcessor)
+	}
+	return nil
+}
+
+func indexPaymentObligations(workers []Worker) ([]WorkerID, map[WorkerID]*paymentObligation, error) {
+	workerOrder := make([]WorkerID, 0, len(workers))
+	obligations := make(map[WorkerID]*paymentObligation, len(workers))
+	for _, worker := range workers {
+		if _, exists := obligations[worker.ID()]; exists {
+			return nil, nil, fmt.Errorf("%w: duplicate worker ID %q", ErrInvalidProcessor, worker.ID())
+		}
+		workerOrder = append(workerOrder, worker.ID())
+		obligations[worker.ID()] = &paymentObligation{
+			worker: worker,
+			status: obligationAvailable,
+		}
+	}
+	return workerOrder, obligations, nil
 }
 
 func canonicalWorkerSet(batchID BatchID, workerIDs []WorkerID) ([]WorkerID, error) {

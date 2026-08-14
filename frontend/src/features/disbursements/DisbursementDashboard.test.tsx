@@ -7,8 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { DisbursementDashboard } from "@/features/disbursements/DisbursementDashboard";
 
 const workers = [
-  { id: "wrk_001", name: "Maya Thompson", amount: "1500.50", currency: "USD" },
-  { id: "wrk_002", name: "Daniel Kim", amount: "2300.00", currency: "EUR" },
+  { id: "w-001", name: "Maya Thompson", amount: "1500.50", currency: "USD" },
+  { id: "w-002", name: "Daniel Kim", amount: "2300.00", currency: "EUR" },
 ] as const;
 
 describe("DisbursementDashboard", () => {
@@ -93,7 +93,7 @@ describe("DisbursementDashboard", () => {
                   results: [
                     {
                       disbursement_id: "disb-001",
-                      worker_id: "wrk_001",
+                      worker_id: "w-001",
                       worker_name: "Maya Thompson",
                       amount: "1500.50",
                       currency: "USD",
@@ -107,12 +107,12 @@ describe("DisbursementDashboard", () => {
                   results: [
                     {
                       disbursement_id: "disb-001",
-                      worker_id: "wrk_001",
+                      worker_id: "w-001",
                       worker_name: "Maya Thompson",
                       amount: "1500.50",
                       currency: "USD",
                       status: "success",
-                      provider_transaction_id: "ptx-001",
+                      provider_txn_id: "ptx-001",
                     },
                   ],
                 },
@@ -173,12 +173,12 @@ describe("DisbursementDashboard", () => {
             results: [
               {
                 disbursement_id: "disb-restored",
-                worker_id: "wrk_001",
+                worker_id: "w-001",
                 worker_name: "Maya Thompson",
                 amount: "1500.50",
                 currency: "USD",
                 status: "success",
-                provider_transaction_id: "ptx-restored",
+                provider_txn_id: "ptx-restored",
               },
             ],
           });
@@ -251,7 +251,7 @@ describe("DisbursementDashboard", () => {
               request_id: "req-conflict",
               unavailable_workers: [
                 {
-                  worker_id: "wrk_001",
+                  worker_id: "w-001",
                   worker_name: "Maya Thompson",
                   reason: "already_paid",
                   batch_id: "batch-paid",
@@ -329,7 +329,7 @@ describe("DisbursementDashboard", () => {
               request_id: "req-stale",
               unavailable_workers: [
                 {
-                  worker_id: "wrk_001",
+                  worker_id: "w-001",
                   worker_name: "Maya Thompson",
                   reason: "outcome_unknown",
                   batch_id: "batch-unknown",
@@ -350,7 +350,7 @@ describe("DisbursementDashboard", () => {
             results: [
               {
                 disbursement_id: "disb-unknown",
-                worker_id: "wrk_001",
+                worker_id: "w-001",
                 worker_name: "Maya Thompson",
                 amount: "1500.50",
                 currency: "USD",
@@ -407,7 +407,7 @@ describe("DisbursementDashboard", () => {
             results: [
               {
                 disbursement_id: "disb-failed",
-                worker_id: "wrk_001",
+                worker_id: "w-001",
                 worker_name: "Maya Thompson",
                 amount: "1500.50",
                 currency: "USD",
@@ -416,7 +416,7 @@ describe("DisbursementDashboard", () => {
               },
               {
                 disbursement_id: "disb-unknown",
-                worker_id: "wrk_002",
+                worker_id: "w-002",
                 worker_name: "Daniel Kim",
                 amount: "2300.00",
                 currency: "EUR",

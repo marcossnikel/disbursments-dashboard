@@ -343,7 +343,7 @@ func mapBatchSnapshot(snapshot disbursement.BatchSnapshot) openapi.BatchSnapshot
 		}
 		if result.ProviderTransactionID != "" {
 			providerTransactionID := string(result.ProviderTransactionID)
-			mappedResult.ProviderTransactionId = &providerTransactionID
+			mappedResult.ProviderTxnId = &providerTransactionID
 		}
 		if result.ErrorCode != "" {
 			errorCode := openapi.ProviderErrorCode(result.ErrorCode)
