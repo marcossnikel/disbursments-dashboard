@@ -1,370 +1,209 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, RefreshCw, RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ApiError } from "@/api/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BatchConfirmationDialog } from "@/features/disbursements/BatchConfirmationDialog";
 import { BatchProgress } from "@/features/disbursements/BatchProgress";
 import { DemoResetDialog } from "@/features/disbursements/DemoResetDialog";
+import { useDisbursementWorkflow } from "@/features/disbursements/useDisbursementWorkflow";
 import { WorkerSelection } from "@/features/disbursements/WorkerSelection";
-import {
-  batchQueryOptions,
-  createBatchID,
-  disbursementBatchesQueryKey,
-  resetDemo,
-  submitBatch,
-  workersQueryKey,
-  workersQueryOptions,
-} from "@/features/disbursements/queries";
 
 export function DisbursementDashboard() {
-  const workersQuery = useQuery(workersQueryOptions());
-  const queryClient = useQueryClient();
-  const [selectedWorkerIDs, setSelectedWorkerIDs] = useState<
-    ReadonlySet<string>
-  >(() => new Set());
-  const [isConfirmationOpen, setConfirmationOpen] = useState(false);
-  const [isResetDialogOpen, setResetDialogOpen] = useState(false);
-  const [activeBatchID, setActiveBatchID] = useState<string | null>(
-    readBatchIDFromURL,
-  );
-  const [retryingWorkerID, setRetryingWorkerID] = useState<string | null>(null);
-  const [retryPreparationError, setRetryPreparationError] = useState<
-    string | null
-  >(null);
-  const batchQuery = useQuery(batchQueryOptions(activeBatchID));
-  const submitBatchMutation = useMutation({
-    mutationFn: submitBatch,
-    onSuccess: (submission) => {
-      setActiveBatchID(submission.batch_id);
-      writeBatchIDToURL(submission.batch_id);
-      setConfirmationOpen(false);
-      setSelectedWorkerIDs(new Set());
-      void queryClient.invalidateQueries({ queryKey: workersQueryKey });
-    },
-  });
-  const resetDemoMutation = useMutation({
-    mutationFn: resetDemo,
-    onSuccess: async () => {
-      setActiveBatchID(null);
-      clearBatchIDFromURL();
-      setSelectedWorkerIDs(new Set());
-      setRetryPreparationError(null);
-      setResetDialogOpen(false);
-      queryClient.removeQueries({ queryKey: disbursementBatchesQueryKey });
-      await queryClient.invalidateQueries({ queryKey: workersQueryKey });
-    },
-  });
+  const workflow = useDisbursementWorkflow();
 
-  useEffect(() => {
-    if (batchQuery.data?.status === "completed") {
-      void queryClient.invalidateQueries({ queryKey: workersQueryKey });
-    }
-  }, [batchQuery.data?.status, queryClient]);
-
-  if (workersQuery.isPending) {
+  if (workflow.workersLoading) {
     return <WorkersLoadingState />;
   }
 
-  if (workersQuery.isError) {
-    return (
-      <Alert
-        variant="destructive"
-        className="border-status-danger/15 bg-status-danger-soft"
-      >
-        <AlertCircle aria-hidden="true" />
-        <AlertTitle>We couldn't load pending disbursements</AlertTitle>
-        <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <span>
-            Check that the API is running, then try again. Your selection has
-            not changed.
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void workersQuery.refetch()}
-          >
-            <RefreshCw aria-hidden="true" />
-            Try again
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  const workers = workersQuery.data;
-  const selectedWorkers = workers.filter((worker) =>
-    selectedWorkerIDs.has(worker.id),
-  );
-
-  function toggleWorker(workerID: string) {
-    setSelectedWorkerIDs((currentSelection) => {
-      const nextSelection = new Set(currentSelection);
-      if (nextSelection.has(workerID)) {
-        nextSelection.delete(workerID);
-      } else {
-        nextSelection.add(workerID);
-      }
-      return nextSelection;
-    });
-  }
-
-  function toggleAllWorkers() {
-    setSelectedWorkerIDs((currentSelection) =>
-      currentSelection.size === workers.length
-        ? new Set()
-        : new Set(workers.map((worker) => worker.id)),
-    );
-  }
-
-  function confirmBatch() {
-    submitBatchMutation.mutate({
-      batchID: createBatchID(),
-      workerIDs: selectedWorkers.map((worker) => worker.id),
-    });
-  }
-
-  const submissionError =
-    submitBatchMutation.error instanceof ApiError
-      ? submitBatchMutation.error
-      : undefined;
-  const unavailableWorkers =
-    submissionError?.details?.code === "workers_unavailable"
-      ? submissionError.details.unavailable_workers
-      : undefined;
-
-  function continueWithAvailableWorkers() {
-    const unavailableWorkerIDs = new Set(
-      unavailableWorkers?.map((worker) => worker.worker_id) ?? [],
-    );
-    setSelectedWorkerIDs(
-      new Set(
-        selectedWorkers
-          .filter((worker) => !unavailableWorkerIDs.has(worker.id))
-          .map((worker) => worker.id),
-      ),
-    );
-    setConfirmationOpen(false);
-    submitBatchMutation.reset();
-    void queryClient.invalidateQueries({ queryKey: workersQueryKey });
-  }
-
-  function removeUnavailableWorkersFromSelection() {
-    const unavailableWorkerIDs = new Set(
-      unavailableWorkers?.map((worker) => worker.worker_id) ?? [],
-    );
-    setSelectedWorkerIDs(
-      (currentSelection) =>
-        new Set(
-          [...currentSelection].filter(
-            (workerID) => !unavailableWorkerIDs.has(workerID),
-          ),
-        ),
-    );
-    void queryClient.invalidateQueries({ queryKey: workersQueryKey });
-  }
-
-  function viewConflictingPayment() {
-    const batchID = unavailableWorkers?.[0]?.batch_id;
-    if (!batchID) {
-      return;
-    }
-    removeUnavailableWorkersFromSelection();
-    setActiveBatchID(batchID);
-    writeBatchIDToURL(batchID);
-    setConfirmationOpen(false);
-    submitBatchMutation.reset();
-  }
-
-  function stopTrackingBatch() {
-    setActiveBatchID(null);
-    clearBatchIDFromURL();
-  }
-
-  async function prepareRetry(workerID: string) {
-    setRetryingWorkerID(workerID);
-    setRetryPreparationError(null);
-
-    try {
-      const refreshedWorkers = await workersQuery.refetch();
-      if (refreshedWorkers.isError) {
-        setRetryPreparationError(
-          "We couldn't refresh this worker. No retry was started; check the connection and try again.",
-        );
-        return;
-      }
-      const workerIsAvailable = refreshedWorkers.data?.some(
-        (worker) => worker.id === workerID,
-      );
-      if (!workerIsAvailable) {
-        setRetryPreparationError(
-          "This worker is no longer available for a new batch. Review the original payment before taking another action.",
-        );
-        return;
-      }
-
-      setSelectedWorkerIDs(new Set([workerID]));
-      submitBatchMutation.reset();
-      setConfirmationOpen(true);
-    } catch {
-      setRetryPreparationError(
-        "We couldn't refresh this worker. No retry was started; check the connection and try again.",
-      );
-    } finally {
-      setRetryingWorkerID(null);
-    }
+  if (workflow.workersLoadFailed) {
+    return <WorkersLoadError onRetry={() => void workflow.refreshWorkers()} />;
   }
 
   return (
     <>
-      {batchQuery.data ? (
+      {workflow.batch ? (
         <BatchProgress
-          batch={batchQuery.data}
-          refreshFailed={batchQuery.isRefetchError}
-          isRefreshing={batchQuery.isFetching}
-          lastUpdatedAt={batchQuery.dataUpdatedAt}
-          onRefresh={() => void batchQuery.refetch()}
-          retryingWorkerID={retryingWorkerID}
-          onPrepareRetry={(workerID) => void prepareRetry(workerID)}
+          batch={workflow.batch}
+          refreshFailed={workflow.batchRefreshFailed}
+          isRefreshing={workflow.isBatchRefreshing}
+          lastUpdatedAt={workflow.lastBatchUpdatedAt}
+          onRefresh={() => void workflow.refreshBatch()}
+          retryingWorkerID={workflow.retryingWorkerID}
+          onPrepareRetry={(workerID) => void workflow.prepareRetry(workerID)}
         />
       ) : null}
-      {activeBatchID !== null && batchQuery.isPending ? (
-        <BatchLoadingState />
-      ) : null}
-      {activeBatchID !== null && batchQuery.isError && !batchQuery.data ? (
-        <Alert
-          variant="destructive"
-          className="mb-6 border-status-danger/15 bg-status-danger-soft"
-        >
-          <AlertCircle aria-hidden="true" />
-          <AlertTitle>We couldn't load batch {activeBatchID}</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              The batch may still be processing. Retrying is safe because it
-              only reads status. Stopping tracking clears this view; it does not
-              cancel payments.
-              {batchQuery.error instanceof ApiError ? (
-                <span className="mt-1 block font-mono text-xs">
-                  Request {batchQuery.error.requestID}
-                </span>
-              ) : null}
-            </span>
-            <span className="flex shrink-0 flex-wrap gap-2">
-              <Button variant="ghost" size="sm" onClick={stopTrackingBatch}>
-                Stop tracking
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void batchQuery.refetch()}
-              >
-                <RefreshCw aria-hidden="true" />
-                Retry status
-              </Button>
-            </span>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {retryPreparationError ? (
+
+      <BatchTrackingFeedback
+        activeBatchID={workflow.activeBatchID}
+        isLoading={workflow.isBatchLoading}
+        error={workflow.batchError}
+        hasBatch={workflow.batch !== undefined}
+        onStopTracking={workflow.stopTrackingBatch}
+        onRetry={() => void workflow.refreshBatch()}
+      />
+
+      {workflow.retryPreparationError ? (
         <Alert className="mb-6 border-status-warning/20 bg-status-warning-soft">
           <AlertCircle aria-hidden="true" />
           <AlertTitle>Retry was not prepared</AlertTitle>
-          <AlertDescription>{retryPreparationError}</AlertDescription>
+          <AlertDescription>{workflow.retryPreparationError}</AlertDescription>
         </Alert>
       ) : null}
-      {workers.length === 0 ? (
-        <Card className="border-dashed bg-white/75 py-14 text-center">
-          <CardContent>
-            <p className="text-lg font-semibold">No pending disbursements</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Every available worker obligation has already been processed or
-              reserved.
-            </p>
-            <Button
-              variant="outline"
-              className="mt-5"
-              disabled={batchQuery.data?.status === "processing"}
-              onClick={() => setResetDialogOpen(true)}
-            >
-              <RotateCcw aria-hidden="true" />
-              Reset demo data
-            </Button>
-            {batchQuery.data?.status === "processing" ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Reset becomes available after the active batch finishes.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+
+      {workflow.workers.length === 0 ? (
+        <NoPendingDisbursements
+          resetDisabled={workflow.batch?.status === "processing"}
+          onReset={workflow.openResetDialog}
+        />
       ) : (
         <WorkerSelection
-          workers={workers}
-          selectedWorkerIDs={selectedWorkerIDs}
-          onToggleWorker={toggleWorker}
-          onToggleAllWorkers={toggleAllWorkers}
-          onReviewBatch={() => setConfirmationOpen(true)}
+          workers={workflow.workers}
+          selectedWorkerIDs={workflow.selectedWorkerIDs}
+          onToggleWorker={workflow.toggleWorker}
+          onToggleAllWorkers={workflow.toggleAllWorkers}
+          onReviewBatch={workflow.openConfirmation}
         />
       )}
+
       <BatchConfirmationDialog
-        open={isConfirmationOpen}
-        workers={selectedWorkers}
-        onOpenChange={(open) => {
-          setConfirmationOpen(open);
-          if (!open) {
-            if (hasUnavailableWorkers(unavailableWorkers)) {
-              removeUnavailableWorkersFromSelection();
-            }
-            submitBatchMutation.reset();
-          }
-        }}
-        onConfirm={confirmBatch}
-        isSubmitting={submitBatchMutation.isPending}
-        errorMessage={submitBatchMutation.error?.message}
-        requestID={submissionError?.requestID}
-        unavailableWorkers={unavailableWorkers}
-        onViewPaymentDetails={viewConflictingPayment}
-        onContinueWithAvailableWorkers={continueWithAvailableWorkers}
+        open={workflow.isConfirmationOpen}
+        workers={workflow.selectedWorkers}
+        onOpenChange={workflow.changeConfirmationOpen}
+        onConfirm={workflow.confirmBatch}
+        isSubmitting={workflow.isSubmittingBatch}
+        errorMessage={workflow.submissionErrorMessage}
+        requestID={workflow.submissionError?.requestID}
+        unavailableWorkers={workflow.unavailableWorkers}
+        onViewPaymentDetails={workflow.viewConflictingPayment}
+        onContinueWithAvailableWorkers={workflow.continueWithAvailableWorkers}
       />
       <DemoResetDialog
-        open={isResetDialogOpen}
-        isResetting={resetDemoMutation.isPending}
-        errorMessage={resetDemoMutation.error?.message}
-        onOpenChange={(open) => {
-          setResetDialogOpen(open);
-          if (!open) {
-            resetDemoMutation.reset();
-          }
-        }}
-        onConfirm={() => resetDemoMutation.mutate()}
+        open={workflow.isResetDialogOpen}
+        isResetting={workflow.isResettingDemo}
+        errorMessage={workflow.resetDemoErrorMessage}
+        onOpenChange={workflow.changeResetDialogOpen}
+        onConfirm={workflow.confirmDemoReset}
       />
     </>
   );
 }
 
-function hasUnavailableWorkers(
-  workers: readonly { worker_id: string }[] | undefined,
-): workers is readonly { worker_id: string }[] {
-  return workers !== undefined && workers.length > 0;
+function WorkersLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Alert
+      variant="destructive"
+      className="border-status-danger/15 bg-status-danger-soft"
+    >
+      <AlertCircle aria-hidden="true" />
+      <AlertTitle>We couldn't load pending disbursements</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          Check that the API is running, then try again. Your selection has not
+          changed.
+        </span>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          <RefreshCw aria-hidden="true" />
+          Try again
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
 }
 
-function readBatchIDFromURL(): string | null {
-  return new URLSearchParams(window.location.search).get("batch");
+type BatchTrackingFeedbackProps = {
+  activeBatchID: string | null;
+  isLoading: boolean;
+  error: Error | null;
+  hasBatch: boolean;
+  onStopTracking: () => void;
+  onRetry: () => void;
+};
+
+function BatchTrackingFeedback({
+  activeBatchID,
+  isLoading,
+  error,
+  hasBatch,
+  onStopTracking,
+  onRetry,
+}: BatchTrackingFeedbackProps) {
+  if (activeBatchID === null) {
+    return null;
+  }
+  if (isLoading) {
+    return <BatchLoadingState />;
+  }
+  if (!error || hasBatch) {
+    return null;
+  }
+
+  return (
+    <Alert
+      variant="destructive"
+      className="mb-6 border-status-danger/15 bg-status-danger-soft"
+    >
+      <AlertCircle aria-hidden="true" />
+      <AlertTitle>We couldn't load batch {activeBatchID}</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          The batch may still be processing. Retrying is safe because it only
+          reads status. Stopping tracking clears this view; it does not cancel
+          payments.
+          {error instanceof ApiError ? (
+            <span className="mt-1 block font-mono text-xs">
+              Request {error.requestID}
+            </span>
+          ) : null}
+        </span>
+        <span className="flex shrink-0 flex-wrap gap-2">
+          <Button variant="ghost" size="sm" onClick={onStopTracking}>
+            Stop tracking
+          </Button>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            <RefreshCw aria-hidden="true" />
+            Retry status
+          </Button>
+        </span>
+      </AlertDescription>
+    </Alert>
+  );
 }
 
-function writeBatchIDToURL(batchID: string) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("batch", batchID);
-  window.history.replaceState(null, "", url);
-}
-
-function clearBatchIDFromURL() {
-  const url = new URL(window.location.href);
-  url.searchParams.delete("batch");
-  window.history.replaceState(null, "", url);
+function NoPendingDisbursements({
+  resetDisabled,
+  onReset,
+}: {
+  resetDisabled: boolean;
+  onReset: () => void;
+}) {
+  return (
+    <Card className="border-dashed bg-white/75 py-14 text-center">
+      <CardContent>
+        <p className="text-lg font-semibold">No pending disbursements</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Every available worker obligation has already been processed or
+          reserved.
+        </p>
+        <Button
+          variant="outline"
+          className="mt-5"
+          disabled={resetDisabled}
+          onClick={onReset}
+        >
+          <RotateCcw aria-hidden="true" />
+          Reset demo data
+        </Button>
+        {resetDisabled ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Reset becomes available after the active batch finishes.
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
 }
 
 function BatchLoadingState() {
