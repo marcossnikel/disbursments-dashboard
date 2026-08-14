@@ -4,3 +4,6 @@ generate:
   models: true
 output-options:
   skip-prune: true
+  name-normalizer: ToCamelCaseWithInitialisms
+  additional-initialisms:
+    - IDs

@@ -134,8 +134,8 @@ type BatchID = string
 
 // BatchSnapshot defines model for BatchSnapshot.
 type BatchSnapshot struct {
-	// BatchId Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
-	BatchId BatchID              `json:"batch_id"`
+	// BatchID Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
+	BatchID BatchID              `json:"batch_id"`
 	Results []DisbursementResult `json:"results"`
 	Status  BatchStatus          `json:"status"`
 }
@@ -151,8 +151,8 @@ type DisbursementResult struct {
 	Amount   string   `json:"amount"`
 	Currency Currency `json:"currency"`
 
-	// DisbursementId Example: disb-fc09316e
-	DisbursementId string `json:"disbursement_id"`
+	// DisbursementID Example: disb-fc09316e
+	DisbursementID string `json:"disbursement_id"`
 
 	// Error Present only when status is failed.
 	Error *ProviderErrorCode `json:"error,omitempty"`
@@ -160,14 +160,14 @@ type DisbursementResult struct {
 	// ErrorMessage Present only when status is failed.
 	ErrorMessage *string `json:"error_message,omitempty"`
 
-	// ProviderTxnId Present only when status is success.
+	// ProviderTxnID Present only when status is success.
 	//
 	// Example: ptx-e41723a4
-	ProviderTxnId *string            `json:"provider_txn_id,omitempty"`
+	ProviderTxnID *string            `json:"provider_txn_id,omitempty"`
 	Status        DisbursementStatus `json:"status"`
 
-	// WorkerId Example: w-001
-	WorkerId   WorkerID `json:"worker_id"`
+	// WorkerID Example: w-001
+	WorkerID   WorkerID `json:"worker_id"`
 	WorkerName string   `json:"worker_name"`
 }
 
@@ -181,7 +181,7 @@ type ErrorCode string
 type ErrorResponse struct {
 	Code               ErrorCode            `json:"code"`
 	Message            string               `json:"message"`
-	RequestId          string               `json:"request_id"`
+	RequestID          string               `json:"request_id"`
 	UnavailableWorkers *[]UnavailableWorker `json:"unavailable_workers,omitempty"`
 }
 
@@ -190,15 +190,15 @@ type ProviderErrorCode string
 
 // SubmitBatchRequest defines model for SubmitBatchRequest.
 type SubmitBatchRequest struct {
-	// BatchId Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
-	BatchId   BatchID    `json:"batch_id"`
-	WorkerIds []WorkerID `json:"worker_ids"`
+	// BatchID Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
+	BatchID   BatchID    `json:"batch_id"`
+	WorkerIDs []WorkerID `json:"worker_ids"`
 }
 
 // SubmitBatchResponse defines model for SubmitBatchResponse.
 type SubmitBatchResponse struct {
-	// BatchId Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
-	BatchId BatchID `json:"batch_id"`
+	// BatchID Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
+	BatchID BatchID `json:"batch_id"`
 }
 
 // UnavailableReason defines model for UnavailableReason.
@@ -206,13 +206,13 @@ type UnavailableReason string
 
 // UnavailableWorker defines model for UnavailableWorker.
 type UnavailableWorker struct {
-	// BatchId Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
-	BatchId        BatchID           `json:"batch_id"`
-	DisbursementId string            `json:"disbursement_id"`
+	// BatchID Example: batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475
+	BatchID        BatchID           `json:"batch_id"`
+	DisbursementID string            `json:"disbursement_id"`
 	Reason         UnavailableReason `json:"reason"`
 
-	// WorkerId Example: w-001
-	WorkerId   WorkerID `json:"worker_id"`
+	// WorkerID Example: w-001
+	WorkerID   WorkerID `json:"worker_id"`
 	WorkerName string   `json:"worker_name"`
 }
 
@@ -222,8 +222,8 @@ type Worker struct {
 	Amount   string   `json:"amount"`
 	Currency Currency `json:"currency"`
 
-	// Id Example: w-001
-	Id WorkerID `json:"id"`
+	// ID Example: w-001
+	ID WorkerID `json:"id"`
 
 	// Name Example: Maya Thompson
 	Name string `json:"name"`

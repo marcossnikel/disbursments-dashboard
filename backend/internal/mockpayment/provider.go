@@ -1,3 +1,4 @@
+// Package mockpayment simulates the unreliable provider required by the exercise.
 package mockpayment
 
 import (
@@ -19,23 +20,18 @@ const (
 // Provider simulates the unreliable downstream payment provider from the exercise.
 type Provider struct{}
 
-func New() *Provider {
-	return &Provider{}
+// New returns a stateless simulated payment provider.
+func New() Provider {
+	return Provider{}
 }
 
-func (p *Provider) Pay(
+// Pay waits for randomized latency, then succeeds or fails at the configured rate.
+func (Provider) Pay(
 	ctx context.Context,
 	_ disbursement.PaymentRequest,
 ) (disbursement.PaymentResult, error) {
-	latencyRange := maximumLatency - minimumLatency
-	latency := minimumLatency + time.Duration(mathrand.Int64N(int64(latencyRange)+1))
-	timer := time.NewTimer(latency)
-	defer timer.Stop()
-
-	select {
-	case <-timer.C:
-	case <-ctx.Done():
-		return disbursement.PaymentResult{}, ctx.Err()
+	if err := waitForLatency(ctx, generateLatency()); err != nil {
+		return disbursement.PaymentResult{}, err
 	}
 
 	if mathrand.Float64() < failureRate {
@@ -50,4 +46,21 @@ func (p *Provider) Pay(
 			"ptx-" + strings.ToLower(cryptorand.Text()),
 		),
 	}, nil
+}
+
+func generateLatency() time.Duration {
+	latencyRange := maximumLatency - minimumLatency
+	return minimumLatency + time.Duration(mathrand.Int64N(int64(latencyRange)+1))
+}
+
+func waitForLatency(ctx context.Context, latency time.Duration) error {
+	timer := time.NewTimer(latency)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

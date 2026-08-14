@@ -1,27 +1,31 @@
 package disbursement
 
-import (
-	"fmt"
-	"strings"
-)
-
+// BatchID uniquely identifies one idempotent submission.
 type BatchID string
 
+// BatchStatus describes whether a batch still has pending provider calls.
 type BatchStatus string
 
 const (
+	// BatchProcessing means at least one payment is still pending.
 	BatchProcessing BatchStatus = "processing"
-	BatchCompleted  BatchStatus = "completed"
+	// BatchCompleted means every payment reached a terminal state.
+	BatchCompleted BatchStatus = "completed"
 )
 
+// DisbursementStatus describes the state of one payment attempt.
 type DisbursementStatus string
 
 const (
+	// StatusPending means the provider call has not completed.
 	StatusPending DisbursementStatus = "pending"
+	// StatusSuccess means the provider returned a transaction ID.
 	StatusSuccess DisbursementStatus = "success"
-	StatusFailed  DisbursementStatus = "failed"
+	// StatusFailed means the provider call returned a terminal failure.
+	StatusFailed DisbursementStatus = "failed"
 )
 
+// DisbursementResult is the current outcome of one worker payment.
 type DisbursementResult struct {
 	DisbursementID        DisbursementID
 	Worker                Worker
@@ -31,47 +35,43 @@ type DisbursementResult struct {
 	ErrorMessage          string
 }
 
+// BatchSnapshot is a point-in-time copy safe for callers to read.
 type BatchSnapshot struct {
 	BatchID BatchID
 	Status  BatchStatus
 	Results []DisbursementResult
 }
 
-type Submission struct {
-	BatchID BatchID
-	Created bool
+type storedBatch struct {
+	id                 BatchID
+	canonicalWorkerIDs []WorkerID
+	resultOrder        []WorkerID
+	results            map[WorkerID]*DisbursementResult
+	pendingCount       int
 }
 
-type UnavailableReason string
+// Batch returns a snapshot of a submitted batch.
+func (p *Processor) Batch(batchID BatchID) (BatchSnapshot, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
-const (
-	AlreadyPending UnavailableReason = "already_pending"
-	AlreadyPaid    UnavailableReason = "already_paid"
-)
-
-type UnavailableWorker struct {
-	Worker         Worker
-	Reason         UnavailableReason
-	BatchID        BatchID
-	DisbursementID DisbursementID
-}
-
-type IdempotencyConflictError struct {
-	BatchID BatchID
-}
-
-func (e *IdempotencyConflictError) Error() string {
-	return fmt.Sprintf("batch ID %q was already used with a different worker set", e.BatchID)
-}
-
-type WorkersUnavailableError struct {
-	Workers []UnavailableWorker
-}
-
-func (e *WorkersUnavailableError) Error() string {
-	workerIDs := make([]string, 0, len(e.Workers))
-	for _, unavailableWorker := range e.Workers {
-		workerIDs = append(workerIDs, string(unavailableWorker.Worker.ID()))
+	storedBatch, exists := p.batches[batchID]
+	if !exists {
+		return BatchSnapshot{}, false
 	}
-	return fmt.Sprintf("workers are unavailable: %s", strings.Join(workerIDs, ", "))
+
+	status := BatchProcessing
+	if storedBatch.pendingCount == 0 {
+		status = BatchCompleted
+	}
+	results := make([]DisbursementResult, 0, len(storedBatch.resultOrder))
+	for _, workerID := range storedBatch.resultOrder {
+		results = append(results, *storedBatch.results[workerID])
+	}
+
+	return BatchSnapshot{
+		BatchID: storedBatch.id,
+		Status:  status,
+		Results: results,
+	}, true
 }

@@ -61,8 +61,9 @@ A batch is reserved atomically: if any selected worker is unavailable, no provid
 ```text
 api/openapi.yaml                 shared HTTP contract
 backend/cmd/api                  composition, signals, and server lifecycle
+backend/internal/demodata        reviewer-facing worker fixtures
 backend/internal/disbursement    money, obligations, batches, and concurrency
-backend/internal/httpserver      HTTP translation and request IDs
+backend/internal/httpserver      HTTP handlers, middleware, and wire translation
 backend/internal/mockpayment     flaky 50–200 ms provider
 frontend/src/api                 generated types and typed client
 frontend/src/features/disbursements

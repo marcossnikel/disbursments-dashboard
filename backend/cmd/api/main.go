@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/demodata"
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/disbursement"
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/httpserver"
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/mockpayment"
@@ -35,15 +36,12 @@ func main() {
 }
 
 func run(shutdownSignal context.Context, logger *slog.Logger) error {
-	workers, err := disbursement.SeedWorkers()
+	workers, err := demodata.Workers()
 	if err != nil {
 		return fmt.Errorf("seed workers: %w", err)
 	}
 
-	processingContext, cancelProcessing := context.WithCancel(context.Background())
-	defer cancelProcessing()
 	processor, err := disbursement.NewProcessor(
-		processingContext,
 		workers,
 		disbursement.ProcessorConfig{
 			Provider:        mockpayment.New(),
@@ -80,8 +78,6 @@ func run(shutdownSignal context.Context, logger *slog.Logger) error {
 
 	select {
 	case err := <-serverErrors:
-		cancelProcessing()
-		processor.Wait()
 		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
@@ -92,12 +88,10 @@ func run(shutdownSignal context.Context, logger *slog.Logger) error {
 
 	shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancelShutdown()
-	shutdownErr := server.Shutdown(shutdownContext)
-	cancelProcessing()
-	processor.Wait()
-	if shutdownErr != nil {
-		return fmt.Errorf("shutdown HTTP server: %w", shutdownErr)
+	if err := server.Shutdown(shutdownContext); err != nil {
+		return fmt.Errorf("shutdown HTTP server: %w", err)
 	}
+	processor.Wait()
 
 	logger.Info("API stopped")
 	return nil

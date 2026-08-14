@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// WorkerID uniquely identifies a payment recipient in the demo dataset.
 type WorkerID string
 
 // Worker identifies a recipient and the current payment obligation shown in the dashboard.
@@ -15,8 +16,10 @@ type Worker struct {
 	amount Money
 }
 
+// ErrInvalidWorker reports an invalid worker identity or payment amount.
 var ErrInvalidWorker = errors.New("invalid worker")
 
+// NewWorker validates and creates a worker payment obligation.
 func NewWorker(id WorkerID, name string, amount Money) (Worker, error) {
 	if strings.TrimSpace(string(id)) == "" {
 		return Worker{}, fmt.Errorf("%w: ID is required", ErrInvalidWorker)
@@ -31,49 +34,17 @@ func NewWorker(id WorkerID, name string, amount Money) (Worker, error) {
 	return Worker{id: id, name: name, amount: amount}, nil
 }
 
+// ID returns the worker identifier.
 func (w Worker) ID() WorkerID {
 	return w.id
 }
 
+// Name returns the worker display name.
 func (w Worker) Name() string {
 	return w.name
 }
 
+// Amount returns the exact pending payment amount.
 func (w Worker) Amount() Money {
 	return w.amount
-}
-
-func SeedWorkers() ([]Worker, error) {
-	seeds := []struct {
-		id       WorkerID
-		name     string
-		amount   string
-		currency Currency
-	}{
-		{id: "w-001", name: "Maya Thompson", amount: "1500.50", currency: USD},
-		{id: "w-002", name: "Daniel Kim", amount: "2300.00", currency: EUR},
-		{id: "w-003", name: "Sofia Martinez", amount: "1875.25", currency: USD},
-		{id: "w-004", name: "Lucas Ferreira", amount: "2140.80", currency: EUR},
-		{id: "w-005", name: "Amina Diallo", amount: "1980.45", currency: USD},
-		{id: "w-006", name: "Noah Williams", amount: "1750.00", currency: EUR},
-		{id: "w-007", name: "Priya Shah", amount: "2200.10", currency: USD},
-		{id: "w-008", name: "Mateo Ruiz", amount: "2450.75", currency: EUR},
-		{id: "w-009", name: "Lina Haddad", amount: "1625.30", currency: USD},
-		{id: "w-010", name: "Jonas Berg", amount: "2050.60", currency: EUR},
-	}
-
-	workers := make([]Worker, 0, len(seeds))
-	for _, seed := range seeds {
-		amount, err := ParseMoney(seed.amount, seed.currency)
-		if err != nil {
-			return nil, fmt.Errorf("seed worker %q amount: %w", seed.id, err)
-		}
-		worker, err := NewWorker(seed.id, seed.name, amount)
-		if err != nil {
-			return nil, fmt.Errorf("seed worker %q: %w", seed.id, err)
-		}
-		workers = append(workers, worker)
-	}
-
-	return workers, nil
 }

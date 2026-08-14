@@ -1,27 +1,44 @@
 package disbursement_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/disbursement"
 )
 
-func TestParseMoneyPreservesAnExactUSDDecimal(t *testing.T) {
+func TestParseMoneyPreservesExactMinorUnits(t *testing.T) {
 	t.Parallel()
 
-	money, err := disbursement.ParseMoney("1500.50", disbursement.USD)
-	if err != nil {
-		t.Fatalf("ParseMoney() error = %v", err)
+	testCases := []struct {
+		amount     string
+		minorUnits disbursement.MinorUnits
+	}{
+		{amount: "0.01", minorUnits: 1},
+		{amount: "0.10", minorUnits: 10},
+		{amount: "1.00", minorUnits: 100},
+		{amount: "1500.50", minorUnits: 150050},
+		{amount: "92233720368547758.07", minorUnits: math.MaxInt64},
 	}
 
-	if got, want := money.MinorUnits(), disbursement.MinorUnits(150050); got != want {
-		t.Errorf("MinorUnits() = %d, want %d", got, want)
-	}
-	if got, want := money.Currency(), disbursement.USD; got != want {
-		t.Errorf("Currency() = %q, want %q", got, want)
-	}
-	if got, want := money.String(), "1500.50"; got != want {
-		t.Errorf("String() = %q, want %q", got, want)
+	for _, testCase := range testCases {
+		t.Run(testCase.amount, func(t *testing.T) {
+			t.Parallel()
+
+			money, err := disbursement.ParseMoney(testCase.amount, disbursement.USD)
+			if err != nil {
+				t.Fatalf("ParseMoney() error = %v", err)
+			}
+			if got, want := money.MinorUnits(), testCase.minorUnits; got != want {
+				t.Errorf("MinorUnits() = %d, want %d", got, want)
+			}
+			if got, want := money.Currency(), disbursement.USD; got != want {
+				t.Errorf("Currency() = %q, want %q", got, want)
+			}
+			if got, want := money.String(), testCase.amount; got != want {
+				t.Errorf("String() = %q, want %q", got, want)
+			}
+		})
 	}
 }
 
