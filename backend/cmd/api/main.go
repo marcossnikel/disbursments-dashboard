@@ -18,10 +18,18 @@ import (
 )
 
 const (
-	defaultAddress        = ":8080"
+	apiAddressEnvironmentVariable     = "API_ADDRESS"
+	frontendOriginEnvironmentVariable = "FRONTEND_ORIGIN"
+
+	defaultAPIAddress     = ":8080"
 	defaultFrontendOrigin = "http://localhost:5173"
-	providerTimeout       = time.Second
-	shutdownTimeout       = 5 * time.Second
+
+	providerPaymentTimeout      = time.Second
+	serverShutdownTimeout       = 5 * time.Second
+	serverReadHeaderTimeout     = 5 * time.Second
+	serverRequestReadTimeout    = 10 * time.Second
+	serverResponseWriteTimeout  = 10 * time.Second
+	serverIdleConnectionTimeout = 60 * time.Second
 )
 
 func main() {
@@ -45,7 +53,7 @@ func run(shutdownSignal context.Context, logger *slog.Logger) error {
 		workers,
 		disbursement.ProcessorConfig{
 			Provider:        mockpayment.New(),
-			ProviderTimeout: providerTimeout,
+			ProviderTimeout: providerPaymentTimeout,
 			Logger:          logger,
 		},
 	)
@@ -56,19 +64,27 @@ func run(shutdownSignal context.Context, logger *slog.Logger) error {
 	handler, err := httpserver.New(
 		processor,
 		logger,
-		httpserver.Config{AllowedOrigin: environmentValue("FRONTEND_ORIGIN", defaultFrontendOrigin)},
+		httpserver.Config{
+			AllowedOrigin: environmentValue(
+				frontendOriginEnvironmentVariable,
+				defaultFrontendOrigin,
+			),
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("create HTTP handler: %w", err)
 	}
 
 	server := &http.Server{
-		Addr:              environmentValue("API_ADDRESS", defaultAddress),
+		Addr: environmentValue(
+			apiAddressEnvironmentVariable,
+			defaultAPIAddress,
+		),
 		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		ReadTimeout:       serverRequestReadTimeout,
+		WriteTimeout:      serverResponseWriteTimeout,
+		IdleTimeout:       serverIdleConnectionTimeout,
 	}
 	serverErrors := make(chan error, 1)
 	go func() {
@@ -86,7 +102,10 @@ func run(shutdownSignal context.Context, logger *slog.Logger) error {
 		logger.Info("API shutdown requested")
 	}
 
-	shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), shutdownTimeout)
+	shutdownContext, cancelShutdown := context.WithTimeout(
+		context.Background(),
+		serverShutdownTimeout,
+	)
 	defer cancelShutdown()
 	if err := server.Shutdown(shutdownContext); err != nil {
 		return fmt.Errorf("shutdown HTTP server: %w", err)
