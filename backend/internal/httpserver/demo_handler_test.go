@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/openapi"
 )
@@ -18,11 +17,7 @@ func TestServerResetsCompletedDemoStateButRejectsAResetDuringProcessing(t *testi
 		BatchID: "batch-reset-demo", WorkerIDs: []string{"w-001"},
 	})
 	decodeJSON(t, batchResponse, &openapi.SubmitBatchResponse{})
-	select {
-	case <-provider.started:
-	case <-time.After(time.Second):
-		t.Fatal("provider payment did not start")
-	}
+	waitForPaymentStarts(t, provider.started, 1)
 
 	blockedReset := postDemoReset(t, testServer.Client(), testServer.URL)
 	if got, want := blockedReset.StatusCode, http.StatusConflict; got != want {

@@ -68,6 +68,55 @@ func newGatedProvider(failingWorker disbursement.WorkerID) *gatedProvider {
 	}
 }
 
+func newTestProcessor(
+	t *testing.T,
+	provider disbursement.PaymentProvider,
+	workerCount int,
+) *disbursement.Processor {
+	t.Helper()
+	return newTestProcessorWithTimeout(t, provider, workerCount, time.Second)
+}
+
+func newTestProcessorWithTimeout(
+	t *testing.T,
+	provider disbursement.PaymentProvider,
+	workerCount int,
+	providerTimeout time.Duration,
+) *disbursement.Processor {
+	t.Helper()
+
+	processor, err := disbursement.NewProcessor(
+		testWorkers(t, workerCount),
+		disbursement.ProcessorConfig{
+			Provider:        provider,
+			ProviderTimeout: providerTimeout,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
+	return processor
+}
+
+func waitForPaymentStarts(
+	t *testing.T,
+	started <-chan disbursement.PaymentRequest,
+	count int,
+) []disbursement.PaymentRequest {
+	t.Helper()
+
+	requests := make([]disbursement.PaymentRequest, 0, count)
+	for range count {
+		select {
+		case request := <-started:
+			requests = append(requests, request)
+		case <-time.After(time.Second):
+			t.Fatalf("provider calls started = %d, want %d", len(requests), count)
+		}
+	}
+	return requests
+}
+
 func (p *gatedProvider) Pay(ctx context.Context, request disbursement.PaymentRequest) (disbursement.PaymentResult, error) {
 	p.started <- request
 	select {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -55,12 +56,58 @@ func (p *gatedProvider) Pay(ctx context.Context, request disbursement.PaymentReq
 	}, nil
 }
 
-func newTestServer(
+func TestNewServerRejectsInvalidConfiguration(t *testing.T) {
+	t.Parallel()
+
+	logger := slog.New(slog.DiscardHandler)
+	processor := newTestProcessor(t, unusedProvider{}, 1, logger)
+	testCases := []struct {
+		name      string
+		processor *disbursement.Processor
+		logger    *slog.Logger
+		config    httpserver.Config
+	}{
+		{
+			name:   "missing processor",
+			logger: logger,
+			config: httpserver.Config{AllowedOrigin: "http://localhost:5173"},
+		},
+		{
+			name:      "missing logger",
+			processor: processor,
+			config:    httpserver.Config{AllowedOrigin: "http://localhost:5173"},
+		},
+		{
+			name:      "missing allowed origin",
+			processor: processor,
+			logger:    logger,
+		},
+		{
+			name:      "blank allowed origin",
+			processor: processor,
+			logger:    logger,
+			config:    httpserver.Config{AllowedOrigin: "  "},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := httpserver.New(testCase.processor, testCase.logger, testCase.config)
+			if !errors.Is(err, httpserver.ErrInvalidServer) {
+				t.Fatalf("httpserver.New() error = %v, want ErrInvalidServer", err)
+			}
+		})
+	}
+}
+
+func newTestProcessor(
 	t *testing.T,
 	provider disbursement.PaymentProvider,
 	workerCount int,
 	logger *slog.Logger,
-) *httptest.Server {
+) *disbursement.Processor {
 	t.Helper()
 
 	workers, err := demodata.Workers()
@@ -73,6 +120,18 @@ func newTestServer(
 	if err != nil {
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
+	return processor
+}
+
+func newTestServer(
+	t *testing.T,
+	provider disbursement.PaymentProvider,
+	workerCount int,
+	logger *slog.Logger,
+) *httptest.Server {
+	t.Helper()
+
+	processor := newTestProcessor(t, provider, workerCount, logger)
 	handler, err := httpserver.New(
 		processor,
 		logger,
@@ -154,6 +213,25 @@ func waitForCompletedBatch(t *testing.T, client *http.Client, serverURL, batchID
 	}
 	t.Fatalf("batch %q did not complete before the deadline", batchID)
 	return openapi.BatchSnapshot{}
+}
+
+func waitForPaymentStarts(
+	t *testing.T,
+	started <-chan disbursement.PaymentRequest,
+	count int,
+) []disbursement.PaymentRequest {
+	t.Helper()
+
+	requests := make([]disbursement.PaymentRequest, 0, count)
+	for range count {
+		select {
+		case request := <-started:
+			requests = append(requests, request)
+		case <-time.After(time.Second):
+			t.Fatalf("provider calls started = %d, want %d", len(requests), count)
+		}
+	}
+	return requests
 }
 
 func decodeJSON(t *testing.T, response *http.Response, destination any) {

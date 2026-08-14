@@ -3,7 +3,6 @@ package disbursement_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/disbursement"
 )
@@ -12,21 +11,12 @@ func TestProcessorResetRestoresWorkersAndClearsCompletedBatches(t *testing.T) {
 	t.Parallel()
 
 	provider := newCountingProvider()
-	processor, err := disbursement.NewProcessor(testWorkers(t, 2), disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second,
-	})
-	if err != nil {
-		t.Fatalf("NewProcessor() error = %v", err)
-	}
+	processor := newTestProcessor(t, provider, 2)
 
 	if _, err := processor.Submit(context.Background(), "batch-before-reset", []disbursement.WorkerID{"w-001"}); err != nil {
 		t.Fatalf("Submit() error = %v", err)
 	}
-	select {
-	case <-provider.started:
-	case <-time.After(time.Second):
-		t.Fatal("provider payment did not start")
-	}
+	waitForPaymentStarts(t, provider.started, 1)
 	close(provider.release)
 	waitForCompletedBatch(t, processor, "batch-before-reset")
 

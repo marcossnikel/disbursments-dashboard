@@ -2,23 +2,30 @@ package disbursement_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/disbursement"
 )
 
+type resultProvider struct {
+	result disbursement.PaymentResult
+	err    error
+}
+
+func (provider resultProvider) Pay(
+	context.Context,
+	disbursement.PaymentRequest,
+) (disbursement.PaymentResult, error) {
+	return provider.result, provider.err
+}
+
 func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T) {
 	t.Parallel()
 
-	workers := testWorkers(t, 2)
 	provider := newGatedProvider("w-002")
-	processor, err := disbursement.NewProcessor(workers, disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second,
-	})
-	if err != nil {
-		t.Fatalf("NewProcessor() error = %v", err)
-	}
+	processor := newTestProcessor(t, provider, 2)
 
 	submission, err := processor.Submit(
 		context.Background(),
@@ -46,13 +53,8 @@ func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T
 	}
 
 	startedWorkers := map[disbursement.WorkerID]bool{}
-	for range 2 {
-		select {
-		case request := <-provider.started:
-			startedWorkers[request.WorkerID] = true
-		case <-time.After(time.Second):
-			t.Fatal("provider calls did not overlap before either was released")
-		}
+	for _, request := range waitForPaymentStarts(t, provider.started, 2) {
+		startedWorkers[request.WorkerID] = true
 	}
 	if !startedWorkers["w-001"] || !startedWorkers["w-002"] {
 		t.Fatalf("started workers = %v, want w-001 and w-002", startedWorkers)
@@ -89,12 +91,7 @@ func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T
 func TestProcessorMakesTimedOutWorkerAvailableForANewAttempt(t *testing.T) {
 	t.Parallel()
 
-	processor, err := disbursement.NewProcessor(testWorkers(t, 1), disbursement.ProcessorConfig{
-		Provider: timeoutProvider{}, ProviderTimeout: 10 * time.Millisecond,
-	})
-	if err != nil {
-		t.Fatalf("NewProcessor() error = %v", err)
-	}
+	processor := newTestProcessorWithTimeout(t, timeoutProvider{}, 1, 10*time.Millisecond)
 
 	if _, err := processor.Submit(context.Background(), "batch-timeout", []disbursement.WorkerID{"w-001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
@@ -114,4 +111,97 @@ func TestProcessorMakesTimedOutWorkerAvailableForANewAttempt(t *testing.T) {
 		t.Fatalf("new attempt Submit() error = %v", err)
 	}
 	waitForCompletedBatch(t, processor, "batch-new-attempt")
+}
+
+func TestProcessorRecordsProviderOutcomes(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                 string
+		provider             disbursement.PaymentProvider
+		wantStatus           disbursement.DisbursementStatus
+		wantErrorCode        disbursement.ProviderErrorCode
+		wantTransactionID    disbursement.ProviderTransactionID
+		wantAvailableWorkers int
+	}{
+		{
+			name: "success with transaction ID",
+			provider: resultProvider{result: disbursement.PaymentResult{
+				ProviderTransactionID: "ptx-success",
+			}},
+			wantStatus:           disbursement.StatusSuccess,
+			wantTransactionID:    "ptx-success",
+			wantAvailableWorkers: 0,
+		},
+		{
+			name: "typed provider decline",
+			provider: resultProvider{err: &disbursement.ProviderFailure{
+				Code: disbursement.ProviderDeclined, Message: "the provider declined this payment",
+			}},
+			wantStatus:           disbursement.StatusFailed,
+			wantErrorCode:        disbursement.ProviderDeclined,
+			wantAvailableWorkers: 1,
+		},
+		{
+			name:                 "provider deadline",
+			provider:             resultProvider{err: context.DeadlineExceeded},
+			wantStatus:           disbursement.StatusFailed,
+			wantErrorCode:        disbursement.ProviderTimeout,
+			wantAvailableWorkers: 1,
+		},
+		{
+			name:                 "generic provider error",
+			provider:             resultProvider{err: errors.New("provider unavailable")},
+			wantStatus:           disbursement.StatusFailed,
+			wantErrorCode:        disbursement.ProviderError,
+			wantAvailableWorkers: 1,
+		},
+		{
+			name:                 "missing transaction ID",
+			provider:             resultProvider{},
+			wantStatus:           disbursement.StatusFailed,
+			wantErrorCode:        disbursement.ProviderError,
+			wantAvailableWorkers: 1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			processor := newTestProcessor(t, testCase.provider, 1)
+			const batchID = disbursement.BatchID("batch-provider-outcome")
+			if _, err := processor.Submit(
+				context.Background(),
+				batchID,
+				[]disbursement.WorkerID{"w-001"},
+			); err != nil {
+				t.Fatalf("Submit(%q) error = %v", batchID, err)
+			}
+
+			completed := waitForCompletedBatch(t, processor, batchID)
+			result := completed.Results[0]
+			if got := result.Status; got != testCase.wantStatus {
+				t.Errorf("Batch(%q) result status = %q, want %q", batchID, got, testCase.wantStatus)
+			}
+			if got := result.ErrorCode; got != testCase.wantErrorCode {
+				t.Errorf("Batch(%q) error code = %q, want %q", batchID, got, testCase.wantErrorCode)
+			}
+			if got := result.ProviderTransactionID; got != testCase.wantTransactionID {
+				t.Errorf(
+					"Batch(%q) provider transaction ID = %q, want %q",
+					batchID,
+					got,
+					testCase.wantTransactionID,
+				)
+			}
+			if got := len(processor.AvailableWorkers()); got != testCase.wantAvailableWorkers {
+				t.Errorf(
+					"len(AvailableWorkers()) = %d, want %d",
+					got,
+					testCase.wantAvailableWorkers,
+				)
+			}
+		})
+	}
 }

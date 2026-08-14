@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/disbursement"
 )
@@ -14,12 +13,7 @@ func TestProcessorCreatesProviderWorkOnceForSimultaneousReplays(t *testing.T) {
 	t.Parallel()
 
 	provider := newCountingProvider()
-	processor, err := disbursement.NewProcessor(testWorkers(t, 2), disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second,
-	})
-	if err != nil {
-		t.Fatalf("NewProcessor() error = %v", err)
-	}
+	processor := newTestProcessor(t, provider, 2)
 
 	const submitterCount = 20
 	start := make(chan struct{})
@@ -61,13 +55,7 @@ func TestProcessorCreatesProviderWorkOnceForSimultaneousReplays(t *testing.T) {
 		t.Fatalf("created submission count = %d, want %d", got, want)
 	}
 
-	for range 2 {
-		select {
-		case <-provider.started:
-		case <-time.After(time.Second):
-			t.Fatal("expected provider work was not started")
-		}
-	}
+	waitForPaymentStarts(t, provider.started, 2)
 	close(provider.release)
 	waitForCompletedBatch(t, processor, "batch-idempotent")
 	for _, workerID := range []disbursement.WorkerID{"w-001", "w-002"} {
@@ -77,23 +65,66 @@ func TestProcessorCreatesProviderWorkOnceForSimultaneousReplays(t *testing.T) {
 	}
 }
 
-func TestProcessorRejectsAnUnknownWorkerBeforeStartingPayments(t *testing.T) {
+func TestProcessorRejectsInvalidSubmissionsBeforeStartingPayments(t *testing.T) {
 	t.Parallel()
 
-	provider := newCountingProvider()
-	processor, err := disbursement.NewProcessor(testWorkers(t, 1), disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second,
-	})
-	if err != nil {
-		t.Fatalf("NewProcessor() error = %v", err)
+	testCases := []struct {
+		name      string
+		ctx       context.Context
+		batchID   disbursement.BatchID
+		workerIDs []disbursement.WorkerID
+	}{
+		{
+			name: "missing context", batchID: "batch-invalid",
+			workerIDs: []disbursement.WorkerID{"w-001"},
+		},
+		{
+			name: "missing batch ID", ctx: context.Background(),
+			workerIDs: []disbursement.WorkerID{"w-001"},
+		},
+		{
+			name: "blank batch ID", ctx: context.Background(), batchID: "  ",
+			workerIDs: []disbursement.WorkerID{"w-001"},
+		},
+		{name: "missing workers", ctx: context.Background(), batchID: "batch-invalid"},
+		{
+			name: "blank worker ID", ctx: context.Background(), batchID: "batch-invalid",
+			workerIDs: []disbursement.WorkerID{"  "},
+		},
+		{
+			name: "duplicate worker ID", ctx: context.Background(), batchID: "batch-invalid",
+			workerIDs: []disbursement.WorkerID{"w-001", "w-001"},
+		},
+		{
+			name: "unknown worker ID", ctx: context.Background(), batchID: "batch-invalid",
+			workerIDs: []disbursement.WorkerID{"w-999"},
+		},
 	}
 
-	_, submitErr := processor.Submit(context.Background(), "batch-invalid", []disbursement.WorkerID{"w-999"})
-	if !errors.Is(submitErr, disbursement.ErrInvalidSubmission) {
-		t.Fatalf("Submit() error = %v, want ErrInvalidSubmission", submitErr)
-	}
-	if got := provider.callCount("w-999"); got != 0 {
-		t.Fatalf("provider calls for unknown worker = %d, want 0", got)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider := newCountingProvider()
+			processor := newTestProcessor(t, provider, 1)
+			_, err := processor.Submit(testCase.ctx, testCase.batchID, testCase.workerIDs)
+			if !errors.Is(err, disbursement.ErrInvalidSubmission) {
+				t.Fatalf(
+					"Submit(%q, %v) error = %v, want ErrInvalidSubmission",
+					testCase.batchID,
+					testCase.workerIDs,
+					err,
+				)
+			}
+			if _, found := processor.Batch(testCase.batchID); found {
+				t.Errorf("Batch(%q) found = true, want false", testCase.batchID)
+			}
+			select {
+			case request := <-provider.started:
+				t.Errorf("provider received unexpected request for worker %q", request.WorkerID)
+			default:
+			}
+		})
 	}
 }
 
@@ -101,21 +132,12 @@ func TestProcessorRejectsAnEntireBatchWhenOneWorkerIsPending(t *testing.T) {
 	t.Parallel()
 
 	provider := newCountingProvider()
-	processor, err := disbursement.NewProcessor(testWorkers(t, 2), disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second,
-	})
-	if err != nil {
-		t.Fatalf("NewProcessor() error = %v", err)
-	}
+	processor := newTestProcessor(t, provider, 2)
 
 	if _, err := processor.Submit(context.Background(), "batch-first", []disbursement.WorkerID{"w-001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
 	}
-	select {
-	case <-provider.started:
-	case <-time.After(time.Second):
-		t.Fatal("first provider payment did not start")
-	}
+	waitForPaymentStarts(t, provider.started, 1)
 
 	_, submitErr := processor.Submit(
 		context.Background(),
@@ -144,12 +166,7 @@ func TestProcessorRejectsChangedWorkersForAnExistingBatchID(t *testing.T) {
 	t.Parallel()
 
 	provider := newCountingProvider()
-	processor, err := disbursement.NewProcessor(testWorkers(t, 2), disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second,
-	})
-	if err != nil {
-		t.Fatalf("NewProcessor() error = %v", err)
-	}
+	processor := newTestProcessor(t, provider, 2)
 
 	if _, err := processor.Submit(context.Background(), "batch-conflict", []disbursement.WorkerID{"w-001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
@@ -167,11 +184,7 @@ func TestProcessorRejectsChangedWorkersForAnExistingBatchID(t *testing.T) {
 		t.Errorf("provider calls for changed worker = %d, want 0", got)
 	}
 
-	select {
-	case <-provider.started:
-	case <-time.After(time.Second):
-		t.Fatal("original provider payment did not start")
-	}
+	waitForPaymentStarts(t, provider.started, 1)
 	close(provider.release)
 	waitForCompletedBatch(t, processor, "batch-conflict")
 }

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/marcosnikel/cadana-disbursement-tool/backend/internal/openapi"
 )
@@ -35,13 +34,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 			t.Errorf("initial worker %q status = %q, want %q", result.WorkerID, got, want)
 		}
 	}
-	for range 2 {
-		select {
-		case <-provider.started:
-		case <-time.After(time.Second):
-			t.Fatal("provider calls did not start")
-		}
-	}
+	waitForPaymentStarts(t, provider.started, 2)
 	close(provider.release)
 
 	completed := waitForCompletedBatch(t, testServer.Client(), testServer.URL, submission.BatchID)
@@ -97,11 +90,7 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 		BatchID: "batch-paid", WorkerIDs: []string{"w-001"},
 	})
 	decodeJSON(t, firstResponse, &openapi.SubmitBatchResponse{})
-	select {
-	case <-provider.started:
-	case <-time.After(time.Second):
-		t.Fatal("first provider payment did not start")
-	}
+	waitForPaymentStarts(t, provider.started, 1)
 	close(provider.release)
 	waitForCompletedBatch(t, testServer.Client(), testServer.URL, "batch-paid")
 
@@ -166,6 +155,69 @@ func TestServerRejectsInvalidBatchJSON(t *testing.T) {
 			decodeJSON(t, response, &responseError)
 			if got, want := responseError.Code, openapi.ErrorCodeInvalidRequest; got != want {
 				t.Errorf("error code = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestServerRejectsInvalidBatchSubmissions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		request openapi.SubmitBatchRequest
+	}{
+		{
+			name:    "missing batch ID",
+			request: openapi.SubmitBatchRequest{WorkerIDs: []string{"w-001"}},
+		},
+		{
+			name:    "missing workers",
+			request: openapi.SubmitBatchRequest{BatchID: "batch-invalid"},
+		},
+		{
+			name: "blank worker ID",
+			request: openapi.SubmitBatchRequest{
+				BatchID: "batch-invalid", WorkerIDs: []string{"  "},
+			},
+		},
+		{
+			name: "duplicate worker ID",
+			request: openapi.SubmitBatchRequest{
+				BatchID: "batch-invalid", WorkerIDs: []string{"w-001", "w-001"},
+			},
+		},
+		{
+			name: "unknown worker ID",
+			request: openapi.SubmitBatchRequest{
+				BatchID: "batch-invalid", WorkerIDs: []string{"w-999"},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			provider := newGatedProvider("")
+			testServer := newTestServer(t, provider, 1, slog.New(slog.DiscardHandler))
+			response := postBatch(t, testServer.Client(), testServer.URL, testCase.request)
+			if got, want := response.StatusCode, http.StatusBadRequest; got != want {
+				response.Body.Close()
+				t.Fatalf("POST /disbursements status = %d, want %d", got, want)
+			}
+			var responseError openapi.ErrorResponse
+			decodeJSON(t, response, &responseError)
+			if got, want := responseError.Code, openapi.ErrorCodeInvalidRequest; got != want {
+				t.Errorf("POST /disbursements error code = %q, want %q", got, want)
+			}
+			if got, want := responseError.RequestID, response.Header.Get("X-Request-ID"); got != want {
+				t.Errorf("POST /disbursements request ID = %q, want %q", got, want)
+			}
+			select {
+			case request := <-provider.started:
+				t.Errorf("provider received unexpected request for worker %q", request.WorkerID)
+			default:
 			}
 		})
 	}
