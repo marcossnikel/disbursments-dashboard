@@ -17,10 +17,9 @@ const (
 type DisbursementStatus string
 
 const (
-	StatusPending        DisbursementStatus = "pending"
-	StatusSuccess        DisbursementStatus = "success"
-	StatusFailed         DisbursementStatus = "failed"
-	StatusOutcomeUnknown DisbursementStatus = "outcome_unknown"
+	StatusPending DisbursementStatus = "pending"
+	StatusSuccess DisbursementStatus = "success"
+	StatusFailed  DisbursementStatus = "failed"
 )
 
 type DisbursementResult struct {
@@ -48,7 +47,6 @@ type UnavailableReason string
 const (
 	AlreadyPending UnavailableReason = "already_pending"
 	AlreadyPaid    UnavailableReason = "already_paid"
-	OutcomeUnknown UnavailableReason = "outcome_unknown"
 )
 
 type UnavailableWorker struct {

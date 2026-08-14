@@ -3,7 +3,6 @@ import CircleAlert from "lucide-react/dist/esm/icons/circle-alert.mjs";
 import LoaderCircle from "lucide-react/dist/esm/icons/loader-circle.mjs";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
-import TriangleAlert from "lucide-react/dist/esm/icons/triangle-alert.mjs";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -45,16 +44,10 @@ const statusDetails = {
   },
   failed: {
     label: "Failed",
-    description: "The provider confirmed that this payment was not completed.",
+    description:
+      "The mock provider returned an error and no transaction ID. You can prepare a new confirmed attempt.",
     className: "bg-status-danger-soft text-status-danger",
     icon: CircleAlert,
-  },
-  outcome_unknown: {
-    label: "Payment outcome unknown",
-    description:
-      "The provider timed out before confirming the result. Retry is disabled to prevent paying this worker twice.",
-    className: "bg-status-info-soft text-status-info",
-    icon: TriangleAlert,
   },
 } as const;
 
@@ -112,14 +105,10 @@ export function BatchProgress({
             />
           </div>
 
-          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <dl className="grid grid-cols-3 gap-2">
             <SummaryCount label="Pending" value={counts.pending} />
             <SummaryCount label="Succeeded" value={counts.success} />
             <SummaryCount label="Failed" value={counts.failed} />
-            <SummaryCount
-              label="Outcome unknown"
-              value={counts.outcome_unknown}
-            />
           </dl>
         </div>
 
@@ -262,7 +251,7 @@ function SummaryCount({ label, value }: { label: string; value: number }) {
 }
 
 function countStatuses(batch: BatchSnapshot) {
-  const counts = { pending: 0, success: 0, failed: 0, outcome_unknown: 0 };
+  const counts = { pending: 0, success: 0, failed: 0 };
   for (const result of batch.results) {
     counts[result.status]++;
   }

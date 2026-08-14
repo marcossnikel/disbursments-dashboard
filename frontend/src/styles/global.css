@@ -41,8 +41,6 @@
   --status-warning-soft: #fff6dd;
   --status-danger: #b62f26;
   --status-danger-soft: #fff0ee;
-  --status-info: #4564bd;
-  --status-info-soft: #edf1ff;
   --radius: 0.75rem;
 }
 
@@ -80,8 +78,6 @@
   --color-status-warning-soft: var(--status-warning-soft);
   --color-status-danger: var(--status-danger);
   --color-status-danger-soft: var(--status-danger-soft);
-  --color-status-info: var(--status-info);
-  --color-status-info-soft: var(--status-info-soft);
   --radius-sm: calc(var(--radius) * 0.75);
   --radius-md: calc(var(--radius) * 0.875);
   --radius-lg: var(--radius);

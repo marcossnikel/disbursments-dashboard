@@ -142,7 +142,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 		t.Errorf("initial batch status = %q, want %q", got, want)
 	}
 	for _, result := range pending.Results {
-		if got, want := result.Status, openapi.DisbursementStatusPending; got != want {
+		if got, want := result.Status, openapi.Pending; got != want {
 			t.Errorf("initial worker %q status = %q, want %q", result.WorkerId, got, want)
 		}
 	}
@@ -161,14 +161,19 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 	for _, result := range completed.Results {
 		resultsByWorker[result.WorkerId] = result
 	}
-	if got, want := resultsByWorker["w-001"].Status, openapi.DisbursementStatusSuccess; got != want {
+	if got, want := resultsByWorker["w-001"].Status, openapi.Success; got != want {
 		t.Errorf("w-001 status = %q, want %q", got, want)
 	}
 	if transactionID := resultsByWorker["w-001"].ProviderTxnId; transactionID == nil {
 		t.Error("w-001 provider transaction ID = nil, want a value")
 	}
-	if got, want := resultsByWorker["w-002"].Status, openapi.DisbursementStatusFailed; got != want {
+	if got, want := resultsByWorker["w-002"].Status, openapi.Failed; got != want {
 		t.Errorf("w-002 status = %q, want %q", got, want)
+	}
+	if resultError := resultsByWorker["w-002"].Error; resultError == nil {
+		t.Error("w-002 error = nil, want provider_declined")
+	} else if got, want := *resultError, openapi.ProviderDeclined; got != want {
+		t.Errorf("w-002 error = %q, want %q", got, want)
 	}
 
 	replayResponse := postBatch(t, testServer.Client(), testServer.URL, batchRequest)
@@ -265,7 +270,7 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 	if got, want := detail.WorkerName, "Maya Thompson"; got != want {
 		t.Errorf("unavailable worker name = %q, want %q", got, want)
 	}
-	if got, want := detail.Reason, openapi.UnavailableReasonAlreadyPaid; got != want {
+	if got, want := detail.Reason, openapi.AlreadyPaid; got != want {
 		t.Errorf("unavailable reason = %q, want %q", got, want)
 	}
 

@@ -30,11 +30,10 @@ const (
 	ProviderTimeout  ProviderErrorCode = "provider_timeout"
 )
 
-// ProviderFailure classifies a provider error and whether its financial outcome is known.
+// ProviderFailure classifies an error returned by the exercise's mock provider.
 type ProviderFailure struct {
-	Code           ProviderErrorCode
-	Message        string
-	OutcomeUnknown bool
+	Code    ProviderErrorCode
+	Message string
 }
 
 func (e *ProviderFailure) Error() string {

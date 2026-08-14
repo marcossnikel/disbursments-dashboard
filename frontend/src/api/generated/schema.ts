@@ -103,7 +103,7 @@ export interface components {
         /** @enum {string} */
         BatchStatus: "processing" | "completed";
         /** @enum {string} */
-        DisbursementStatus: "pending" | "success" | "failed" | "outcome_unknown";
+        DisbursementStatus: "pending" | "success" | "failed";
         /** @enum {string} */
         ProviderErrorCode: "provider_declined" | "provider_error" | "provider_timeout";
         DisbursementResult: {
@@ -119,9 +119,9 @@ export interface components {
              * @example ptx-e41723a4
              */
             provider_txn_id?: string;
-            /** @description Present only when status is failed or outcome_unknown. */
-            error_code?: components["schemas"]["ProviderErrorCode"];
-            /** @description Present only when status is failed or outcome_unknown. */
+            /** @description Present only when status is failed. */
+            error?: components["schemas"]["ProviderErrorCode"];
+            /** @description Present only when status is failed. */
             error_message?: string;
         };
         BatchSnapshot: {
@@ -132,7 +132,7 @@ export interface components {
         /** @enum {string} */
         ErrorCode: "invalid_request" | "batch_not_found" | "idempotency_conflict" | "workers_unavailable" | "demo_reset_in_progress" | "internal_error";
         /** @enum {string} */
-        UnavailableReason: "already_pending" | "already_paid" | "outcome_unknown";
+        UnavailableReason: "already_pending" | "already_paid";
         UnavailableWorker: {
             worker_id: components["schemas"]["WorkerID"];
             worker_name: string;

@@ -11,10 +11,9 @@ import (
 )
 
 const (
-	minimumLatency     = 50 * time.Millisecond
-	maximumLatency     = 200 * time.Millisecond
-	unknownOutcomeRate = 0.10
-	failureRate        = 0.30
+	minimumLatency = 50 * time.Millisecond
+	maximumLatency = 200 * time.Millisecond
+	failureRate    = 0.30
 )
 
 // Provider simulates the unreliable downstream payment provider from the exercise.
@@ -39,18 +38,10 @@ func (p *Provider) Pay(
 		return disbursement.PaymentResult{}, ctx.Err()
 	}
 
-	outcome := mathrand.Float64()
-	if outcome < unknownOutcomeRate {
+	if mathrand.Float64() < failureRate {
 		return disbursement.PaymentResult{}, &disbursement.ProviderFailure{
-			Code:           disbursement.ProviderTimeout,
-			Message:        "the provider timed out before confirming the payment",
-			OutcomeUnknown: true,
-		}
-	}
-	if outcome < failureRate {
-		return disbursement.PaymentResult{}, &disbursement.ProviderFailure{
-			Code:    disbursement.ProviderDeclined,
-			Message: "the provider declined the payment",
+			Code:    disbursement.ProviderTimeout,
+			Message: "the mock provider timed out",
 		}
 	}
 

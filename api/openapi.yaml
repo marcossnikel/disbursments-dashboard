@@ -201,7 +201,7 @@ components:
       enum: [processing, completed]
     DisbursementStatus:
       type: string
-      enum: [pending, success, failed, outcome_unknown]
+      enum: [pending, success, failed]
     ProviderErrorCode:
       type: string
       enum: [provider_declined, provider_error, provider_timeout]
@@ -234,13 +234,13 @@ components:
           type: string
           description: Present only when status is success.
           example: ptx-e41723a4
-        error_code:
+        error:
           allOf:
             - $ref: "#/components/schemas/ProviderErrorCode"
-          description: Present only when status is failed or outcome_unknown.
+          description: Present only when status is failed.
         error_message:
           type: string
-          description: Present only when status is failed or outcome_unknown.
+          description: Present only when status is failed.
     BatchSnapshot:
       type: object
       additionalProperties: false
@@ -265,7 +265,7 @@ components:
         - internal_error
     UnavailableReason:
       type: string
-      enum: [already_pending, already_paid, outcome_unknown]
+      enum: [already_pending, already_paid]
     UnavailableWorker:
       type: object
       additionalProperties: false

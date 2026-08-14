@@ -41,22 +41,19 @@ func (e Currency) Valid() bool {
 
 // Defines values for DisbursementStatus.
 const (
-	DisbursementStatusFailed         DisbursementStatus = "failed"
-	DisbursementStatusOutcomeUnknown DisbursementStatus = "outcome_unknown"
-	DisbursementStatusPending        DisbursementStatus = "pending"
-	DisbursementStatusSuccess        DisbursementStatus = "success"
+	Failed  DisbursementStatus = "failed"
+	Pending DisbursementStatus = "pending"
+	Success DisbursementStatus = "success"
 )
 
 // Valid indicates whether the value is a known member of the DisbursementStatus enum.
 func (e DisbursementStatus) Valid() bool {
 	switch e {
-	case DisbursementStatusFailed:
+	case Failed:
 		return true
-	case DisbursementStatusOutcomeUnknown:
+	case Pending:
 		return true
-	case DisbursementStatusPending:
-		return true
-	case DisbursementStatusSuccess:
+	case Success:
 		return true
 	default:
 		return false
@@ -116,19 +113,16 @@ func (e ProviderErrorCode) Valid() bool {
 
 // Defines values for UnavailableReason.
 const (
-	UnavailableReasonAlreadyPaid    UnavailableReason = "already_paid"
-	UnavailableReasonAlreadyPending UnavailableReason = "already_pending"
-	UnavailableReasonOutcomeUnknown UnavailableReason = "outcome_unknown"
+	AlreadyPaid    UnavailableReason = "already_paid"
+	AlreadyPending UnavailableReason = "already_pending"
 )
 
 // Valid indicates whether the value is a known member of the UnavailableReason enum.
 func (e UnavailableReason) Valid() bool {
 	switch e {
-	case UnavailableReasonAlreadyPaid:
+	case AlreadyPaid:
 		return true
-	case UnavailableReasonAlreadyPending:
-		return true
-	case UnavailableReasonOutcomeUnknown:
+	case AlreadyPending:
 		return true
 	default:
 		return false
@@ -160,10 +154,10 @@ type DisbursementResult struct {
 	// DisbursementId Example: disb-fc09316e
 	DisbursementId string `json:"disbursement_id"`
 
-	// ErrorCode Present only when status is failed or outcome_unknown.
-	ErrorCode *ProviderErrorCode `json:"error_code,omitempty"`
+	// Error Present only when status is failed.
+	Error *ProviderErrorCode `json:"error,omitempty"`
 
-	// ErrorMessage Present only when status is failed or outcome_unknown.
+	// ErrorMessage Present only when status is failed.
 	ErrorMessage *string `json:"error_message,omitempty"`
 
 	// ProviderTxnId Present only when status is success.

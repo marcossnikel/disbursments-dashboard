@@ -347,7 +347,7 @@ func mapBatchSnapshot(snapshot disbursement.BatchSnapshot) openapi.BatchSnapshot
 		}
 		if result.ErrorCode != "" {
 			errorCode := openapi.ProviderErrorCode(result.ErrorCode)
-			mappedResult.ErrorCode = &errorCode
+			mappedResult.Error = &errorCode
 		}
 		if result.ErrorMessage != "" {
 			errorMessage := result.ErrorMessage

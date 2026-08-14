@@ -331,9 +331,9 @@ describe("DisbursementDashboard", () => {
                 {
                   worker_id: "w-001",
                   worker_name: "Maya Thompson",
-                  reason: "outcome_unknown",
-                  batch_id: "batch-unknown",
-                  disbursement_id: "disb-unknown",
+                  reason: "already_paid",
+                  batch_id: "batch-paid",
+                  disbursement_id: "disb-paid",
                 },
               ],
             },
@@ -342,21 +342,20 @@ describe("DisbursementDashboard", () => {
         }
         if (
           request.method === "GET" &&
-          url.pathname === "/disbursements/batch-unknown"
+          url.pathname === "/disbursements/batch-paid"
         ) {
           return jsonResponse({
-            batch_id: "batch-unknown",
+            batch_id: "batch-paid",
             status: "completed",
             results: [
               {
-                disbursement_id: "disb-unknown",
+                disbursement_id: "disb-paid",
                 worker_id: "w-001",
                 worker_name: "Maya Thompson",
                 amount: "1500.50",
                 currency: "USD",
-                status: "outcome_unknown",
-                error_code: "provider_timeout",
-                error_message: "Provider confirmation timed out.",
+                status: "success",
+                provider_txn_id: "ptx-paid",
               },
             ],
           });
@@ -415,14 +414,13 @@ describe("DisbursementDashboard", () => {
                 error_message: "Provider declined this disbursement.",
               },
               {
-                disbursement_id: "disb-unknown",
+                disbursement_id: "disb-success",
                 worker_id: "w-002",
                 worker_name: "Daniel Kim",
                 amount: "2300.00",
                 currency: "EUR",
-                status: "outcome_unknown",
-                error_message:
-                  "Provider timed out before confirming the result.",
+                status: "success",
+                provider_txn_id: "ptx-success",
               },
             ],
           });
@@ -434,9 +432,7 @@ describe("DisbursementDashboard", () => {
 
     renderDashboard();
 
-    expect(
-      await screen.findByText("Payment outcome unknown"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Daniel Kim")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
         name: "Prepare retry for Daniel Kim",

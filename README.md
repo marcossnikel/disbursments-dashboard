@@ -36,12 +36,11 @@ That command runs Go tests with the race detector, Go vet, frontend interaction 
 
 The payment attempt and the worker's payment obligation are related, but they are not the same lifecycle:
 
-| Attempt result | Obligation after the result | Operator action |
-| --- | --- | --- |
-| `pending` | Reserved by the accepted batch | Wait and keep polling |
-| `success` | Paid | Never retry |
-| `failed` | Available again | Prepare a new batch and confirm it again |
-| `outcome_unknown` | Blocked | Do not retry until provider reconciliation proves the outcome |
+| Attempt result | Obligation after the result    | Operator action                          |
+| -------------- | ------------------------------ | ---------------------------------------- |
+| `pending`      | Reserved by the accepted batch | Wait and keep polling                    |
+| `success`      | Paid                           | Never retry                              |
+| `failed`       | Available again                | Prepare a new batch and confirm it again |
 
 A batch is reserved atomically: if any selected worker is unavailable, no provider call begins. The conflict response includes the worker, prior batch, disbursement, reason, and request IDs so the UI can explain exactly what happened rather than silently dropping a payment.
 
@@ -52,10 +51,10 @@ A batch is reserved atomically: if any selected worker is unavailable, no provid
 3. Money enters the API as a canonical decimal string and becomes a checked `int64` count of minor units plus currency in Go; the frontend uses `bigint`, so neither side performs monetary arithmetic with floating point.
 4. The processor locks only long enough to validate and reserve the full batch, then calls the provider concurrently outside the lock so partial failures remain independent.
 5. A replay of the same batch ID and canonical worker set returns the existing batch, while the same ID with different workers returns `409` and starts nothing.
-6. A confirmed provider failure releases the obligation for a newly confirmed retry, but a timeout blocks it because the provider may already have moved money.
+6. The exercise treats every simulated provider error as a terminal failure and releases the obligation for a newly confirmed retry; in production, an ambiguous network timeout would require provider idempotency and reconciliation before retrying.
 7. TanStack Query is the single owner of server state and polling, while local React state holds only the current selection and dialog feedback; Zustand would duplicate state without solving a current problem.
 8. Structured JSON access logs carry request ID, status, and duration, while payment lifecycle logs carry batch, disbursement, worker, provider transaction, status, and error identifiers.
-9. The deliberate trade-off is process-local state: it keeps this exercise readable, but production would persist idempotency and obligations and automatically reconcile unknown outcomes through provider lookup or events before involving an operator.
+9. The deliberate trade-off is process-local state: it keeps this exercise readable, while production would persist idempotency and obligations before introducing queues, multiple instances, or automatic recovery.
 
 ## Repository map
 

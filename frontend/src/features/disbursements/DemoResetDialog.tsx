@@ -35,8 +35,7 @@ export function DemoResetDialog({
           <DialogTitle>Reset demo data?</DialogTitle>
           <DialogDescription>
             This clears every in-memory batch and restores all seeded workers as
-            pending disbursements. It is a demo utility, not a payment
-            reconciliation.
+            pending disbursements. It never calls the payment provider.
           </DialogDescription>
         </DialogHeader>
 

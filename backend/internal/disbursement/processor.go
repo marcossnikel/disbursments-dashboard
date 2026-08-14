@@ -45,7 +45,6 @@ const (
 	obligationAvailable paymentObligationStatus = iota
 	obligationReserved
 	obligationPaid
-	obligationOutcomeUnknown
 )
 
 type paymentObligation struct {
@@ -251,8 +250,6 @@ func (p *Processor) unavailableWorkersLocked(workerIDs []WorkerID) []Unavailable
 			reason = AlreadyPending
 		case obligationPaid:
 			reason = AlreadyPaid
-		case obligationOutcomeUnknown:
-			reason = OutcomeUnknown
 		default:
 			continue
 		}
@@ -294,7 +291,7 @@ func (p *Processor) processPayment(batchID BatchID, request PaymentRequest) {
 	p.mu.Unlock()
 
 	logLevel := slog.LevelInfo
-	if resultSnapshot.Status == StatusFailed || resultSnapshot.Status == StatusOutcomeUnknown {
+	if resultSnapshot.Status == StatusFailed {
 		logLevel = slog.LevelWarn
 	}
 	p.logger.Log(
@@ -323,18 +320,13 @@ func (p *Processor) recordFailureLocked(
 	case errors.As(err, &providerFailure):
 		result.ErrorCode = providerFailure.Code
 		result.ErrorMessage = providerFailure.Message
-		if providerFailure.OutcomeUnknown || providerFailure.Code == ProviderTimeout {
-			result.Status = StatusOutcomeUnknown
-			currentObligation.status = obligationOutcomeUnknown
-			return
-		}
 		result.Status = StatusFailed
 		currentObligation.status = obligationAvailable
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-		result.Status = StatusOutcomeUnknown
+		result.Status = StatusFailed
 		result.ErrorCode = ProviderTimeout
-		result.ErrorMessage = "the provider did not confirm whether the payment completed"
-		currentObligation.status = obligationOutcomeUnknown
+		result.ErrorMessage = "the provider request timed out"
+		currentObligation.status = obligationAvailable
 	default:
 		result.Status = StatusFailed
 		result.ErrorCode = ProviderError

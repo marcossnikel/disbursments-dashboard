@@ -244,7 +244,7 @@ func TestProcessorRejectsAnEntireBatchWhenOneWorkerIsPending(t *testing.T) {
 	waitForCompletedBatch(t, processor, "batch-first")
 }
 
-func TestProcessorBlocksAnotherAttemptWhenProviderOutcomeIsUnknown(t *testing.T) {
+func TestProcessorMakesTimedOutWorkerAvailableForANewAttempt(t *testing.T) {
 	t.Parallel()
 
 	workers := firstSeedWorkers(t, 1)
@@ -260,25 +260,29 @@ func TestProcessorBlocksAnotherAttemptWhenProviderOutcomeIsUnknown(t *testing.T)
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
 
-	if _, err := processor.Submit("batch-unknown", []disbursement.WorkerID{"w-001"}); err != nil {
+	if _, err := processor.Submit("batch-timeout", []disbursement.WorkerID{"w-001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
 	}
-	completed := waitForCompletedBatch(t, processor, "batch-unknown")
-	if got, want := completed.Results[0].Status, disbursement.StatusOutcomeUnknown; got != want {
+	completed := waitForCompletedBatch(t, processor, "batch-timeout")
+	if got, want := completed.Results[0].Status, disbursement.StatusFailed; got != want {
 		t.Errorf("result status = %q, want %q", got, want)
 	}
 	if got, want := completed.Results[0].ErrorCode, disbursement.ProviderTimeout; got != want {
 		t.Errorf("result error code = %q, want %q", got, want)
 	}
 
-	_, submitErr := processor.Submit("batch-unsafe-retry", []disbursement.WorkerID{"w-001"})
-	var unavailableError *disbursement.WorkersUnavailableError
-	if !errors.As(submitErr, &unavailableError) {
-		t.Fatalf("retry Submit() error = %v, want WorkersUnavailableError", submitErr)
+	availableWorkers := processor.AvailableWorkers()
+	if got, want := len(availableWorkers), 1; got != want {
+		t.Fatalf("available worker count = %d, want %d", got, want)
 	}
-	if got, want := unavailableError.Workers[0].Reason, disbursement.OutcomeUnknown; got != want {
-		t.Errorf("unavailable reason = %q, want %q", got, want)
+	if got, want := availableWorkers[0].ID(), disbursement.WorkerID("w-001"); got != want {
+		t.Errorf("available worker ID = %q, want %q", got, want)
 	}
+
+	if _, err := processor.Submit("batch-new-attempt", []disbursement.WorkerID{"w-001"}); err != nil {
+		t.Fatalf("new attempt Submit() error = %v", err)
+	}
+	waitForCompletedBatch(t, processor, "batch-new-attempt")
 }
 
 func TestProcessorRejectsChangedWorkersForAnExistingBatchID(t *testing.T) {

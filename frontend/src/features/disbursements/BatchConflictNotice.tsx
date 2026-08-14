@@ -9,6 +9,20 @@ import { Button } from "@/components/ui/button";
 
 type UnavailableWorker = components["schemas"]["UnavailableWorker"];
 
+const unavailableReasonDetails: Record<
+  UnavailableWorker["reason"],
+  { label: string; message: (workerName: string) => string }
+> = {
+  already_paid: {
+    label: "Already paid",
+    message: (workerName) => `${workerName} was already paid.`,
+  },
+  already_pending: {
+    label: "Payment pending",
+    message: (workerName) => `${workerName} already has a payment in progress.`,
+  },
+};
+
 type BatchConflictNoticeProps = {
   unavailableWorkers: readonly UnavailableWorker[];
   availableWorkerCount: number;
@@ -38,24 +52,32 @@ export function BatchConflictNotice({
       </Alert>
 
       <div className="mt-4 space-y-3">
-        {unavailableWorkers.map((worker) => (
-          <div
-            key={worker.worker_id}
-            className="rounded-xl border bg-muted/45 p-3"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold">{reasonMessage(worker)}</p>
-              <Badge variant="outline" className="rounded-full text-[0.65rem]">
-                {reasonLabel(worker.reason)}
-              </Badge>
+        {unavailableWorkers.map((worker) => {
+          const reason = unavailableReasonDetails[worker.reason];
+          return (
+            <div
+              key={worker.worker_id}
+              className="rounded-xl border bg-muted/45 p-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  {reason.message(worker.worker_name)}
+                </p>
+                <Badge
+                  variant="outline"
+                  className="rounded-full text-[0.65rem]"
+                >
+                  {reason.label}
+                </Badge>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.68rem] text-muted-foreground">
+                <span>Worker {worker.worker_id}</span>
+                <span>Batch {worker.batch_id}</span>
+                <span>Disbursement {worker.disbursement_id}</span>
+              </div>
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.68rem] text-muted-foreground">
-              <span>Worker {worker.worker_id}</span>
-              <span>Batch {worker.batch_id}</span>
-              <span>Disbursement {worker.disbursement_id}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
@@ -85,26 +107,4 @@ export function BatchConflictNotice({
       </div>
     </div>
   );
-}
-
-function reasonMessage(worker: UnavailableWorker): string {
-  switch (worker.reason) {
-    case "already_paid":
-      return `${worker.worker_name} was already paid.`;
-    case "already_pending":
-      return `${worker.worker_name} already has a payment in progress.`;
-    case "outcome_unknown":
-      return `${worker.worker_name}'s provider result is unknown. Another payment could pay this worker twice.`;
-  }
-}
-
-function reasonLabel(reason: UnavailableWorker["reason"]): string {
-  switch (reason) {
-    case "already_paid":
-      return "Already paid";
-    case "already_pending":
-      return "Payment pending";
-    case "outcome_unknown":
-      return "Outcome unknown";
-  }
 }
