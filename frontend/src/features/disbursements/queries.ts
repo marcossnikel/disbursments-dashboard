@@ -12,6 +12,8 @@ export type SubmitBatchInput = {
 };
 
 export const workersQueryKey = ["workers"] as const;
+export const disbursementBatchesQueryKey = ["disbursement-batch"] as const;
+const batchPollingIntervalMilliseconds = 400;
 
 export function workersQueryOptions() {
   return queryOptions({
@@ -22,12 +24,25 @@ export function workersQueryOptions() {
 
 export function batchQueryOptions(batchID: string | null) {
   return queryOptions({
-    queryKey: ["disbursement-batch", batchID],
+    queryKey: [...disbursementBatchesQueryKey, batchID],
     queryFn: () => getBatch(batchID ?? ""),
     enabled: batchID !== null,
     refetchInterval: (query) =>
-      query.state.data?.status === "completed" ? false : 400,
+      nextBatchRefreshInterval(
+        query.state.data?.status,
+        query.state.error !== null,
+      ),
   });
+}
+
+export function nextBatchRefreshInterval(
+  status: BatchSnapshot["status"] | undefined,
+  hasError: boolean,
+): false | number {
+  if (hasError || status === "completed") {
+    return false;
+  }
+  return batchPollingIntervalMilliseconds;
 }
 
 export async function submitBatch({
@@ -44,6 +59,13 @@ export async function submitBatch({
     throw apiError(response, error);
   }
   return data;
+}
+
+export async function resetDemo(): Promise<void> {
+  const { error, response } = await apiClient.POST("/demo/reset");
+  if (!response.ok) {
+    throw apiError(response, error);
+  }
 }
 
 export function createBatchID(): string {

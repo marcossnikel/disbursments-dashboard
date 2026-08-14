@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ApiError } from "@/api/client";
@@ -9,10 +9,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BatchConfirmationDialog } from "@/features/disbursements/BatchConfirmationDialog";
 import { BatchProgress } from "@/features/disbursements/BatchProgress";
+import { DemoResetDialog } from "@/features/disbursements/DemoResetDialog";
 import { WorkerSelection } from "@/features/disbursements/WorkerSelection";
 import {
   batchQueryOptions,
   createBatchID,
+  disbursementBatchesQueryKey,
+  resetDemo,
   submitBatch,
   workersQueryKey,
   workersQueryOptions,
@@ -25,6 +28,7 @@ export function DisbursementDashboard() {
     ReadonlySet<string>
   >(() => new Set());
   const [isConfirmationOpen, setConfirmationOpen] = useState(false);
+  const [isResetDialogOpen, setResetDialogOpen] = useState(false);
   const [activeBatchID, setActiveBatchID] = useState<string | null>(
     readBatchIDFromURL,
   );
@@ -43,6 +47,24 @@ export function DisbursementDashboard() {
       void queryClient.invalidateQueries({ queryKey: workersQueryKey });
     },
   });
+  const resetDemoMutation = useMutation({
+    mutationFn: resetDemo,
+    onSuccess: async () => {
+      setActiveBatchID(null);
+      clearBatchIDFromURL();
+      setSelectedWorkerIDs(new Set());
+      setRetryPreparationError(null);
+      setResetDialogOpen(false);
+      queryClient.removeQueries({ queryKey: disbursementBatchesQueryKey });
+      await queryClient.invalidateQueries({ queryKey: workersQueryKey });
+    },
+  });
+
+  useEffect(() => {
+    if (batchQuery.data?.status === "completed") {
+      void queryClient.invalidateQueries({ queryKey: workersQueryKey });
+    }
+  }, [batchQuery.data?.status, queryClient]);
 
   if (workersQuery.isPending) {
     return <WorkersLoadingState />;
@@ -91,6 +113,14 @@ export function DisbursementDashboard() {
     });
   }
 
+  function toggleAllWorkers() {
+    setSelectedWorkerIDs((currentSelection) =>
+      currentSelection.size === workers.length
+        ? new Set()
+        : new Set(workers.map((worker) => worker.id)),
+    );
+  }
+
   function confirmBatch() {
     submitBatchMutation.mutate({
       batchID: createBatchID(),
@@ -120,6 +150,22 @@ export function DisbursementDashboard() {
     );
     setConfirmationOpen(false);
     submitBatchMutation.reset();
+    void queryClient.invalidateQueries({ queryKey: workersQueryKey });
+  }
+
+  function removeUnavailableWorkersFromSelection() {
+    const unavailableWorkerIDs = new Set(
+      unavailableWorkers?.map((worker) => worker.worker_id) ?? [],
+    );
+    setSelectedWorkerIDs(
+      (currentSelection) =>
+        new Set(
+          [...currentSelection].filter(
+            (workerID) => !unavailableWorkerIDs.has(workerID),
+          ),
+        ),
+    );
+    void queryClient.invalidateQueries({ queryKey: workersQueryKey });
   }
 
   function viewConflictingPayment() {
@@ -127,10 +173,16 @@ export function DisbursementDashboard() {
     if (!batchID) {
       return;
     }
+    removeUnavailableWorkersFromSelection();
     setActiveBatchID(batchID);
     writeBatchIDToURL(batchID);
     setConfirmationOpen(false);
     submitBatchMutation.reset();
+  }
+
+  function stopTrackingBatch() {
+    setActiveBatchID(null);
+    clearBatchIDFromURL();
   }
 
   async function prepareRetry(workerID: string) {
@@ -174,6 +226,7 @@ export function DisbursementDashboard() {
           batch={batchQuery.data}
           refreshFailed={batchQuery.isRefetchError}
           isRefreshing={batchQuery.isFetching}
+          lastUpdatedAt={batchQuery.dataUpdatedAt}
           onRefresh={() => void batchQuery.refetch()}
           retryingWorkerID={retryingWorkerID}
           onPrepareRetry={(workerID) => void prepareRetry(workerID)}
@@ -191,17 +244,28 @@ export function DisbursementDashboard() {
           <AlertTitle>We couldn't load batch {activeBatchID}</AlertTitle>
           <AlertDescription className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              The batch may still be processing. Retry without creating another
-              batch.
+              The batch may still be processing. Retrying is safe because it
+              only reads status. Stopping tracking clears this view; it does not
+              cancel payments.
+              {batchQuery.error instanceof ApiError ? (
+                <span className="mt-1 block font-mono text-xs">
+                  Request {batchQuery.error.requestID}
+                </span>
+              ) : null}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void batchQuery.refetch()}
-            >
-              <RefreshCw aria-hidden="true" />
-              Retry status
-            </Button>
+            <span className="flex shrink-0 flex-wrap gap-2">
+              <Button variant="ghost" size="sm" onClick={stopTrackingBatch}>
+                Stop tracking
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void batchQuery.refetch()}
+              >
+                <RefreshCw aria-hidden="true" />
+                Retry status
+              </Button>
+            </span>
           </AlertDescription>
         </Alert>
       ) : null}
@@ -213,13 +277,27 @@ export function DisbursementDashboard() {
         </Alert>
       ) : null}
       {workers.length === 0 ? (
-        <Card className="border-dashed bg-white/75 py-16 text-center">
+        <Card className="border-dashed bg-white/75 py-14 text-center">
           <CardContent>
             <p className="text-lg font-semibold">No pending disbursements</p>
             <p className="mt-2 text-sm text-muted-foreground">
               Every available worker obligation has already been processed or
               reserved.
             </p>
+            <Button
+              variant="outline"
+              className="mt-5"
+              disabled={batchQuery.data?.status === "processing"}
+              onClick={() => setResetDialogOpen(true)}
+            >
+              <RotateCcw aria-hidden="true" />
+              Reset demo data
+            </Button>
+            {batchQuery.data?.status === "processing" ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Reset becomes available after the active batch finishes.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       ) : (
@@ -227,6 +305,7 @@ export function DisbursementDashboard() {
           workers={workers}
           selectedWorkerIDs={selectedWorkerIDs}
           onToggleWorker={toggleWorker}
+          onToggleAllWorkers={toggleAllWorkers}
           onReviewBatch={() => setConfirmationOpen(true)}
         />
       )}
@@ -236,6 +315,9 @@ export function DisbursementDashboard() {
         onOpenChange={(open) => {
           setConfirmationOpen(open);
           if (!open) {
+            if (hasUnavailableWorkers(unavailableWorkers)) {
+              removeUnavailableWorkersFromSelection();
+            }
             submitBatchMutation.reset();
           }
         }}
@@ -247,8 +329,26 @@ export function DisbursementDashboard() {
         onViewPaymentDetails={viewConflictingPayment}
         onContinueWithAvailableWorkers={continueWithAvailableWorkers}
       />
+      <DemoResetDialog
+        open={isResetDialogOpen}
+        isResetting={resetDemoMutation.isPending}
+        errorMessage={resetDemoMutation.error?.message}
+        onOpenChange={(open) => {
+          setResetDialogOpen(open);
+          if (!open) {
+            resetDemoMutation.reset();
+          }
+        }}
+        onConfirm={() => resetDemoMutation.mutate()}
+      />
     </>
   );
+}
+
+function hasUnavailableWorkers(
+  workers: readonly { worker_id: string }[] | undefined,
+): workers is readonly { worker_id: string }[] {
+  return workers !== undefined && workers.length > 0;
 }
 
 function readBatchIDFromURL(): string | null {
@@ -258,6 +358,12 @@ function readBatchIDFromURL(): string | null {
 function writeBatchIDToURL(batchID: string) {
   const url = new URL(window.location.href);
   url.searchParams.set("batch", batchID);
+  window.history.replaceState(null, "", url);
+}
+
+function clearBatchIDFromURL() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("batch");
   window.history.replaceState(null, "", url);
 }
 

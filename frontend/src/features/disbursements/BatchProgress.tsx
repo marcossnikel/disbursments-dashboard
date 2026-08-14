@@ -1,7 +1,6 @@
 import {
   CheckCircle2,
   CircleAlert,
-  Info,
   LoaderCircle,
   RotateCcw,
   RefreshCw,
@@ -27,6 +26,7 @@ type BatchProgressProps = {
   batch: BatchSnapshot;
   refreshFailed: boolean;
   isRefreshing: boolean;
+  lastUpdatedAt: number;
   onRefresh: () => void;
   retryingWorkerID: string | null;
   onPrepareRetry: (workerID: string) => void;
@@ -65,6 +65,7 @@ export function BatchProgress({
   batch,
   refreshFailed,
   isRefreshing,
+  lastUpdatedAt,
   onRefresh,
   retryingWorkerID,
   onPrepareRetry,
@@ -135,8 +136,11 @@ export function BatchProgress({
               <AlertTitle>The latest refresh failed</AlertTitle>
               <AlertDescription className="flex flex-col gap-2 text-white/65 sm:flex-row sm:items-center sm:justify-between">
                 <span>
-                  The results below are the last confirmed snapshot. Processing
-                  may still continue.
+                  The results below were last confirmed at{" "}
+                  <time dateTime={new Date(lastUpdatedAt).toISOString()}>
+                    {formatUpdateTime(lastUpdatedAt)}
+                  </time>
+                  . Processing may still continue.
                 </span>
                 <Button
                   variant="outline"
@@ -165,28 +169,29 @@ export function BatchProgress({
                     <p className="font-medium text-white">
                       {result.worker_name}
                     </p>
-                    <Badge className={cn("rounded-full", details.className)}>
-                      <StatusIcon
-                        aria-hidden="true"
-                        className={cn(
-                          "size-3",
-                          result.status === "pending" && "animate-spin",
-                        )}
-                      />
-                      {details.label}
-                    </Badge>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          className="text-white/45 hover:bg-white/10 hover:text-white"
-                          aria-label={`About ${details.label}`}
+                        <Badge
+                          tabIndex={0}
+                          aria-label={`${details.label}. ${details.description}`}
+                          className={cn(
+                            "cursor-help rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+                            details.className,
+                          )}
                         >
-                          <Info aria-hidden="true" />
-                        </Button>
+                          <StatusIcon
+                            aria-hidden="true"
+                            className={cn(
+                              "size-3",
+                              result.status === "pending" && "animate-spin",
+                            )}
+                          />
+                          {details.label}
+                        </Badge>
                       </TooltipTrigger>
-                      <TooltipContent>{details.description}</TooltipContent>
+                      <TooltipContent className="max-w-72">
+                        {details.description}
+                      </TooltipContent>
                     </Tooltip>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.7rem] text-white/55">
@@ -238,6 +243,14 @@ export function BatchProgress({
       </CardContent>
     </Card>
   );
+}
+
+function formatUpdateTime(timestamp: number): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(timestamp);
 }
 
 function SummaryCount({ label, value }: { label: string; value: number }) {
