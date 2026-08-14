@@ -28,6 +28,7 @@ type Processor struct {
 
 var ErrInvalidProcessor = errors.New("invalid processor")
 var ErrInvalidSubmission = errors.New("invalid submission")
+var ErrDemoResetInProgress = errors.New("cannot reset demo while a batch is processing")
 
 type ProcessorConfig struct {
 	Provider        PaymentProvider
@@ -226,6 +227,29 @@ func (p *Processor) Batch(batchID BatchID) (BatchSnapshot, bool) {
 
 func (p *Processor) Wait() {
 	p.jobs.Wait()
+}
+
+// ResetDemo restores every seeded obligation and removes process-local batch history.
+// It is intentionally unavailable while provider calls are still in progress.
+func (p *Processor) ResetDemo() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for _, storedBatch := range p.batches {
+		if storedBatch.pendingCount > 0 {
+			return ErrDemoResetInProgress
+		}
+	}
+
+	for _, currentObligation := range p.obligations {
+		currentObligation.status = obligationAvailable
+		currentObligation.batchID = ""
+		currentObligation.disbursementID = ""
+	}
+	p.batches = make(map[BatchID]*batch)
+	p.logger.Info("demo state reset", "worker_count", len(p.obligations))
+
+	return nil
 }
 
 func (p *Processor) unavailableWorkersLocked(workerIDs []WorkerID) []UnavailableWorker {

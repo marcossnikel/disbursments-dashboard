@@ -93,6 +93,28 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           $ref: "#/components/responses/InternalError"
+  /demo/reset:
+    post:
+      operationId: resetDemo
+      summary: Restore seeded workers and clear process-local batch history
+      description: Demo-only operation; rejected while a batch is processing.
+      responses:
+        "204":
+          description: Demo state was reset
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+        "409":
+          description: A batch is still processing
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
 components:
   headers:
     RequestID:
@@ -133,7 +155,7 @@ components:
     WorkerID:
       type: string
       minLength: 1
-      example: w-001
+      example: wrk_001
     Currency:
       type: string
       enum: [USD, EUR]
@@ -147,7 +169,7 @@ components:
         name:
           type: string
           minLength: 1
-          example: Ada Lovelace
+          example: Maya Thompson
         amount:
           type: string
           pattern: '^\d+\.\d{2}$'
@@ -239,6 +261,7 @@ components:
         - batch_not_found
         - idempotency_conflict
         - workers_unavailable
+        - demo_reset_in_progress
         - internal_error
     UnavailableReason:
       type: string

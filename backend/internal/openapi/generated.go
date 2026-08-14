@@ -66,6 +66,7 @@ func (e DisbursementStatus) Valid() bool {
 // Defines values for ErrorCode.
 const (
 	ErrorCodeBatchNotFound       ErrorCode = "batch_not_found"
+	ErrorCodeDemoResetInProgress ErrorCode = "demo_reset_in_progress"
 	ErrorCodeIdempotencyConflict ErrorCode = "idempotency_conflict"
 	ErrorCodeInternalError       ErrorCode = "internal_error"
 	ErrorCodeInvalidRequest      ErrorCode = "invalid_request"
@@ -76,6 +77,8 @@ const (
 func (e ErrorCode) Valid() bool {
 	switch e {
 	case ErrorCodeBatchNotFound:
+		return true
+	case ErrorCodeDemoResetInProgress:
 		return true
 	case ErrorCodeIdempotencyConflict:
 		return true
@@ -169,7 +172,7 @@ type DisbursementResult struct {
 	ProviderTransactionId *string            `json:"provider_transaction_id,omitempty"`
 	Status                DisbursementStatus `json:"status"`
 
-	// WorkerId Example: w-001
+	// WorkerId Example: wrk_001
 	WorkerId   WorkerID `json:"worker_id"`
 	WorkerName string   `json:"worker_name"`
 }
@@ -214,7 +217,7 @@ type UnavailableWorker struct {
 	DisbursementId string            `json:"disbursement_id"`
 	Reason         UnavailableReason `json:"reason"`
 
-	// WorkerId Example: w-001
+	// WorkerId Example: wrk_001
 	WorkerId   WorkerID `json:"worker_id"`
 	WorkerName string   `json:"worker_name"`
 }
@@ -225,14 +228,14 @@ type Worker struct {
 	Amount   string   `json:"amount"`
 	Currency Currency `json:"currency"`
 
-	// Id Example: w-001
+	// Id Example: wrk_001
 	Id WorkerID `json:"id"`
 
-	// Name Example: Ada Lovelace
+	// Name Example: Maya Thompson
 	Name string `json:"name"`
 }
 
-// WorkerID Example: w-001
+// WorkerID Example: wrk_001
 type WorkerID = string
 
 // BadRequest defines model for BadRequest.

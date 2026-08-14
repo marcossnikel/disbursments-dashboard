@@ -55,19 +55,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/demo/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore seeded workers and clear process-local batch history
+         * @description Demo-only operation; rejected while a batch is processing.
+         */
+        post: operations["resetDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @example batch-8cdfbc42-fde7-4a5f-a169-8f76b14be475 */
         BatchID: string;
-        /** @example w-001 */
+        /** @example wrk_001 */
         WorkerID: string;
         /** @enum {string} */
         Currency: "USD" | "EUR";
         Worker: {
             id: components["schemas"]["WorkerID"];
-            /** @example Ada Lovelace */
+            /** @example Maya Thompson */
             name: string;
             /** @example 1500.50 */
             amount: string;
@@ -110,7 +130,7 @@ export interface components {
             results: components["schemas"]["DisbursementResult"][];
         };
         /** @enum {string} */
-        ErrorCode: "invalid_request" | "batch_not_found" | "idempotency_conflict" | "workers_unavailable" | "internal_error";
+        ErrorCode: "invalid_request" | "batch_not_found" | "idempotency_conflict" | "workers_unavailable" | "demo_reset_in_progress" | "internal_error";
         /** @enum {string} */
         UnavailableReason: "already_pending" | "already_paid" | "outcome_unknown";
         UnavailableWorker: {
@@ -253,6 +273,36 @@ export interface operations {
             };
             /** @description Batch not found */
             404: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    resetDemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Demo state was reset */
+            204: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A batch is still processing */
+            409: {
                 headers: {
                     "X-Request-ID": components["headers"]["RequestID"];
                     [name: string]: unknown;

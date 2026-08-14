@@ -56,6 +56,7 @@ func New(processor *disbursement.Processor, logger *slog.Logger, config Config) 
 	server.mux.HandleFunc("GET /workers", server.listWorkers)
 	server.mux.HandleFunc("POST /disbursements", server.submitDisbursements)
 	server.mux.HandleFunc("GET /disbursements/{batch_id}", server.getDisbursementBatch)
+	server.mux.HandleFunc("POST /demo/reset", server.resetDemo)
 
 	return server, nil
 }
@@ -195,6 +196,34 @@ func (s *Server) getDisbursementBatch(responseWriter http.ResponseWriter, reques
 	}
 
 	s.writeJSON(responseWriter, http.StatusOK, mapBatchSnapshot(snapshot))
+}
+
+func (s *Server) resetDemo(responseWriter http.ResponseWriter, request *http.Request) {
+	if err := s.processor.ResetDemo(); err != nil {
+		if errors.Is(err, disbursement.ErrDemoResetInProgress) {
+			s.writeError(
+				responseWriter,
+				request,
+				http.StatusConflict,
+				openapi.ErrorCodeDemoResetInProgress,
+				"Wait for the active batch to finish before resetting demo data.",
+				nil,
+			)
+			return
+		}
+		s.logger.Error("reset demo state", "request_id", requestIDFrom(request), "error", err)
+		s.writeError(
+			responseWriter,
+			request,
+			http.StatusInternalServerError,
+			openapi.ErrorCodeInternalError,
+			"The demo data could not be reset.",
+			nil,
+		)
+		return
+	}
+
+	responseWriter.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) writeSubmissionError(

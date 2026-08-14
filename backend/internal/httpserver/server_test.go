@@ -99,7 +99,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SeedWorkers() error = %v", err)
 	}
-	provider := newGatedProvider("w-002")
+	provider := newGatedProvider("wrk_002")
 	processor, err := disbursement.NewProcessor(
 		context.Background(),
 		workers[:2],
@@ -124,7 +124,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 
 	batchRequest := openapi.SubmitBatchRequest{
 		BatchId:   "batch-http-lifecycle",
-		WorkerIds: []string{"w-001", "w-002"},
+		WorkerIds: []string{"wrk_001", "wrk_002"},
 	}
 	response := postBatch(t, testServer.Client(), testServer.URL, batchRequest)
 	if got, want := response.StatusCode, http.StatusAccepted; got != want {
@@ -161,14 +161,14 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 	for _, result := range completed.Results {
 		resultsByWorker[result.WorkerId] = result
 	}
-	if got, want := resultsByWorker["w-001"].Status, openapi.DisbursementStatusSuccess; got != want {
-		t.Errorf("w-001 status = %q, want %q", got, want)
+	if got, want := resultsByWorker["wrk_001"].Status, openapi.DisbursementStatusSuccess; got != want {
+		t.Errorf("wrk_001 status = %q, want %q", got, want)
 	}
-	if transactionID := resultsByWorker["w-001"].ProviderTransactionId; transactionID == nil {
-		t.Error("w-001 provider transaction ID = nil, want a value")
+	if transactionID := resultsByWorker["wrk_001"].ProviderTransactionId; transactionID == nil {
+		t.Error("wrk_001 provider transaction ID = nil, want a value")
 	}
-	if got, want := resultsByWorker["w-002"].Status, openapi.DisbursementStatusFailed; got != want {
-		t.Errorf("w-002 status = %q, want %q", got, want)
+	if got, want := resultsByWorker["wrk_002"].Status, openapi.DisbursementStatusFailed; got != want {
+		t.Errorf("wrk_002 status = %q, want %q", got, want)
 	}
 
 	replayResponse := postBatch(t, testServer.Client(), testServer.URL, batchRequest)
@@ -180,7 +180,7 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 
 	conflictResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
 		BatchId:   batchRequest.BatchId,
-		WorkerIds: []string{"w-001"},
+		WorkerIds: []string{"wrk_001"},
 	})
 	if got, want := conflictResponse.StatusCode, http.StatusConflict; got != want {
 		conflictResponse.Body.Close()
@@ -228,7 +228,7 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 
 	firstResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
 		BatchId:   "batch-paid",
-		WorkerIds: []string{"w-001"},
+		WorkerIds: []string{"wrk_001"},
 	})
 	decodeJSON(t, firstResponse, &openapi.SubmitBatchResponse{})
 	select {
@@ -241,7 +241,7 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 
 	blockedResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
 		BatchId:   "batch-not-started",
-		WorkerIds: []string{"w-001", "w-002"},
+		WorkerIds: []string{"wrk_001", "wrk_002"},
 	})
 	if got, want := blockedResponse.StatusCode, http.StatusConflict; got != want {
 		blockedResponse.Body.Close()
@@ -262,7 +262,7 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 		t.Fatalf("unavailable worker count = %d, want %d", got, want)
 	}
 	detail := (*blockedError.UnavailableWorkers)[0]
-	if got, want := detail.WorkerName, "Ada Lovelace"; got != want {
+	if got, want := detail.WorkerName, "Maya Thompson"; got != want {
 		t.Errorf("unavailable worker name = %q, want %q", got, want)
 	}
 	if got, want := detail.Reason, openapi.UnavailableReasonAlreadyPaid; got != want {
@@ -282,6 +282,89 @@ func TestServerExplainsEveryUnavailableWorkerWithoutStartingTheBatch(t *testing.
 	if got, want := missingError.Code, openapi.ErrorCodeBatchNotFound; got != want {
 		t.Errorf("missing batch code = %q, want %q", got, want)
 	}
+}
+
+func TestServerResetsCompletedDemoStateButRejectsAResetDuringProcessing(t *testing.T) {
+	t.Parallel()
+
+	workers, err := disbursement.SeedWorkers()
+	if err != nil {
+		t.Fatalf("SeedWorkers() error = %v", err)
+	}
+	provider := newGatedProvider("")
+	processor, err := disbursement.NewProcessor(
+		context.Background(),
+		workers[:2],
+		disbursement.ProcessorConfig{
+			Provider:        provider,
+			ProviderTimeout: time.Second,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
+	handler, err := httpserver.New(
+		processor,
+		slog.New(slog.DiscardHandler),
+		httpserver.Config{AllowedOrigin: "http://localhost:5173"},
+	)
+	if err != nil {
+		t.Fatalf("httpserver.New() error = %v", err)
+	}
+	testServer := httptest.NewServer(handler)
+	t.Cleanup(testServer.Close)
+
+	batchResponse := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
+		BatchId:   "batch-reset-demo",
+		WorkerIds: []string{"wrk_001"},
+	})
+	decodeJSON(t, batchResponse, &openapi.SubmitBatchResponse{})
+	select {
+	case <-provider.started:
+	case <-time.After(time.Second):
+		t.Fatal("provider payment did not start")
+	}
+
+	blockedReset := postDemoReset(t, testServer.Client(), testServer.URL)
+	if got, want := blockedReset.StatusCode, http.StatusConflict; got != want {
+		blockedReset.Body.Close()
+		t.Fatalf("POST /demo/reset while processing status = %d, want %d", got, want)
+	}
+	var blockedError openapi.ErrorResponse
+	decodeJSON(t, blockedReset, &blockedError)
+	if got, want := blockedError.Code, openapi.ErrorCode("demo_reset_in_progress"); got != want {
+		t.Errorf("blocked reset code = %q, want %q", got, want)
+	}
+
+	close(provider.release)
+	waitForCompletedBatch(t, testServer.Client(), testServer.URL, "batch-reset-demo")
+
+	completedReset := postDemoReset(t, testServer.Client(), testServer.URL)
+	if got, want := completedReset.StatusCode, http.StatusNoContent; got != want {
+		completedReset.Body.Close()
+		t.Fatalf("POST /demo/reset status = %d, want %d", got, want)
+	}
+	completedReset.Body.Close()
+
+	workersResponse, err := testServer.Client().Get(testServer.URL + "/workers")
+	if err != nil {
+		t.Fatalf("GET /workers after reset error = %v", err)
+	}
+	var restoredWorkers []openapi.Worker
+	decodeJSON(t, workersResponse, &restoredWorkers)
+	if got, want := len(restoredWorkers), 2; got != want {
+		t.Errorf("restored worker count = %d, want %d", got, want)
+	}
+
+	missingBatch, err := testServer.Client().Get(testServer.URL + "/disbursements/batch-reset-demo")
+	if err != nil {
+		t.Fatalf("GET reset batch error = %v", err)
+	}
+	if got, want := missingBatch.StatusCode, http.StatusNotFound; got != want {
+		missingBatch.Body.Close()
+		t.Fatalf("GET reset batch status = %d, want %d", got, want)
+	}
+	missingBatch.Body.Close()
 }
 
 type unusedProvider struct{}
@@ -344,6 +427,20 @@ func postBatch(
 	response, err := client.Post(serverURL+"/disbursements", "application/json", &body)
 	if err != nil {
 		t.Fatalf("POST /disbursements error = %v", err)
+	}
+	return response
+}
+
+func postDemoReset(t *testing.T, client *http.Client, serverURL string) *http.Response {
+	t.Helper()
+
+	request, err := http.NewRequest(http.MethodPost, serverURL+"/demo/reset", nil)
+	if err != nil {
+		t.Fatalf("create POST /demo/reset request: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("POST /demo/reset error = %v", err)
 	}
 	return response
 }

@@ -50,16 +50,16 @@ func SeedWorkers() ([]Worker, error) {
 		amount   string
 		currency Currency
 	}{
-		{id: "w-001", name: "Ada Lovelace", amount: "1500.50", currency: USD},
-		{id: "w-002", name: "Linus Torvalds", amount: "2300.00", currency: EUR},
-		{id: "w-003", name: "Grace Hopper", amount: "1875.25", currency: USD},
-		{id: "w-004", name: "Margaret Hamilton", amount: "2140.80", currency: EUR},
-		{id: "w-005", name: "Katherine Johnson", amount: "1980.45", currency: USD},
-		{id: "w-006", name: "Edsger Dijkstra", amount: "1750.00", currency: EUR},
-		{id: "w-007", name: "Barbara Liskov", amount: "2200.10", currency: USD},
-		{id: "w-008", name: "Donald Knuth", amount: "2450.75", currency: EUR},
-		{id: "w-009", name: "Mary Jackson", amount: "1625.30", currency: USD},
-		{id: "w-010", name: "Radia Perlman", amount: "2050.60", currency: EUR},
+		{id: "wrk_001", name: "Maya Thompson", amount: "1500.50", currency: USD},
+		{id: "wrk_002", name: "Daniel Kim", amount: "2300.00", currency: EUR},
+		{id: "wrk_003", name: "Sofia Martinez", amount: "1875.25", currency: USD},
+		{id: "wrk_004", name: "Lucas Ferreira", amount: "2140.80", currency: EUR},
+		{id: "wrk_005", name: "Amina Diallo", amount: "1980.45", currency: USD},
+		{id: "wrk_006", name: "Noah Williams", amount: "1750.00", currency: EUR},
+		{id: "wrk_007", name: "Priya Shah", amount: "2200.10", currency: USD},
+		{id: "wrk_008", name: "Mateo Ruiz", amount: "2450.75", currency: EUR},
+		{id: "wrk_009", name: "Lina Haddad", amount: "1625.30", currency: USD},
+		{id: "wrk_010", name: "Jonas Berg", amount: "2050.60", currency: EUR},
 	}
 
 	workers := make([]Worker, 0, len(seeds))

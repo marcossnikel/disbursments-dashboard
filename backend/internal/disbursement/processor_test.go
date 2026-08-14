@@ -15,7 +15,7 @@ func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T
 	t.Parallel()
 
 	workers := firstSeedWorkers(t, 2)
-	provider := newGatedProvider("w-002")
+	provider := newGatedProvider("wrk_002")
 	processor, err := disbursement.NewProcessor(
 		context.Background(),
 		workers,
@@ -30,7 +30,7 @@ func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T
 
 	submission, err := processor.Submit(
 		disbursement.BatchID("batch-concurrent"),
-		[]disbursement.WorkerID{"w-001", "w-002"},
+		[]disbursement.WorkerID{"wrk_001", "wrk_002"},
 	)
 	if err != nil {
 		t.Fatalf("Submit() error = %v", err)
@@ -61,8 +61,8 @@ func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T
 			t.Fatal("provider calls did not overlap before either was released")
 		}
 	}
-	if !startedWorkers["w-001"] || !startedWorkers["w-002"] {
-		t.Fatalf("started workers = %v, want w-001 and w-002", startedWorkers)
+	if !startedWorkers["wrk_001"] || !startedWorkers["wrk_002"] {
+		t.Fatalf("started workers = %v, want wrk_001 and wrk_002", startedWorkers)
 	}
 
 	close(provider.release)
@@ -72,24 +72,24 @@ func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T
 	for _, result := range completed.Results {
 		resultsByWorker[result.Worker.ID()] = result
 	}
-	if got, want := resultsByWorker["w-001"].Status, disbursement.StatusSuccess; got != want {
-		t.Errorf("w-001 status = %q, want %q", got, want)
+	if got, want := resultsByWorker["wrk_001"].Status, disbursement.StatusSuccess; got != want {
+		t.Errorf("wrk_001 status = %q, want %q", got, want)
 	}
-	if got, want := resultsByWorker["w-001"].ProviderTransactionID, disbursement.ProviderTransactionID("ptx-w-001"); got != want {
-		t.Errorf("w-001 provider transaction ID = %q, want %q", got, want)
+	if got, want := resultsByWorker["wrk_001"].ProviderTransactionID, disbursement.ProviderTransactionID("ptx-wrk_001"); got != want {
+		t.Errorf("wrk_001 provider transaction ID = %q, want %q", got, want)
 	}
-	if got, want := resultsByWorker["w-002"].Status, disbursement.StatusFailed; got != want {
-		t.Errorf("w-002 status = %q, want %q", got, want)
+	if got, want := resultsByWorker["wrk_002"].Status, disbursement.StatusFailed; got != want {
+		t.Errorf("wrk_002 status = %q, want %q", got, want)
 	}
-	if got, want := resultsByWorker["w-002"].ErrorCode, disbursement.ProviderDeclined; got != want {
-		t.Errorf("w-002 error code = %q, want %q", got, want)
+	if got, want := resultsByWorker["wrk_002"].ErrorCode, disbursement.ProviderDeclined; got != want {
+		t.Errorf("wrk_002 error code = %q, want %q", got, want)
 	}
 
 	availableWorkers := processor.AvailableWorkers()
 	if got, want := len(availableWorkers), 1; got != want {
 		t.Fatalf("len(AvailableWorkers()) = %d, want %d", got, want)
 	}
-	if got, want := availableWorkers[0].ID(), disbursement.WorkerID("w-002"); got != want {
+	if got, want := availableWorkers[0].ID(), disbursement.WorkerID("wrk_002"); got != want {
 		t.Errorf("available worker ID = %q, want %q", got, want)
 	}
 }
@@ -121,7 +121,7 @@ func TestProcessorCreatesProviderWorkOnceForSimultaneousReplays(t *testing.T) {
 			<-start
 			submission, submitErr := processor.Submit(
 				disbursement.BatchID("batch-idempotent"),
-				[]disbursement.WorkerID{"w-001", "w-002"},
+				[]disbursement.WorkerID{"wrk_001", "wrk_002"},
 			)
 			submissions <- submission
 			errors <- submitErr
@@ -160,7 +160,7 @@ func TestProcessorCreatesProviderWorkOnceForSimultaneousReplays(t *testing.T) {
 	close(provider.release)
 	waitForCompletedBatch(t, processor, "batch-idempotent")
 
-	for _, workerID := range []disbursement.WorkerID{"w-001", "w-002"} {
+	for _, workerID := range []disbursement.WorkerID{"wrk_001", "wrk_002"} {
 		if got, want := provider.callCount(workerID), 1; got != want {
 			t.Errorf("provider calls for %q = %d, want %d", workerID, got, want)
 		}
@@ -184,11 +184,11 @@ func TestProcessorRejectsAnUnknownWorkerBeforeStartingPayments(t *testing.T) {
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
 
-	_, submitErr := processor.Submit("batch-invalid", []disbursement.WorkerID{"w-999"})
+	_, submitErr := processor.Submit("batch-invalid", []disbursement.WorkerID{"wrk_999"})
 	if !errors.Is(submitErr, disbursement.ErrInvalidSubmission) {
 		t.Fatalf("Submit() error = %v, want ErrInvalidSubmission", submitErr)
 	}
-	if got := provider.callCount("w-999"); got != 0 {
+	if got := provider.callCount("wrk_999"); got != 0 {
 		t.Fatalf("provider calls for unknown worker = %d, want 0", got)
 	}
 }
@@ -210,7 +210,7 @@ func TestProcessorRejectsAnEntireBatchWhenOneWorkerIsPending(t *testing.T) {
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
 
-	if _, err := processor.Submit("batch-first", []disbursement.WorkerID{"w-001"}); err != nil {
+	if _, err := processor.Submit("batch-first", []disbursement.WorkerID{"wrk_001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
 	}
 	select {
@@ -221,7 +221,7 @@ func TestProcessorRejectsAnEntireBatchWhenOneWorkerIsPending(t *testing.T) {
 
 	_, submitErr := processor.Submit(
 		"batch-blocked",
-		[]disbursement.WorkerID{"w-001", "w-002"},
+		[]disbursement.WorkerID{"wrk_001", "wrk_002"},
 	)
 	var unavailableError *disbursement.WorkersUnavailableError
 	if !errors.As(submitErr, &unavailableError) {
@@ -236,7 +236,7 @@ func TestProcessorRejectsAnEntireBatchWhenOneWorkerIsPending(t *testing.T) {
 	if _, found := processor.Batch("batch-blocked"); found {
 		t.Error("Batch(batch-blocked) found = true, want false")
 	}
-	if got := provider.callCount("w-002"); got != 0 {
+	if got := provider.callCount("wrk_002"); got != 0 {
 		t.Errorf("provider calls for available sibling = %d, want 0", got)
 	}
 
@@ -260,7 +260,7 @@ func TestProcessorBlocksAnotherAttemptWhenProviderOutcomeIsUnknown(t *testing.T)
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
 
-	if _, err := processor.Submit("batch-unknown", []disbursement.WorkerID{"w-001"}); err != nil {
+	if _, err := processor.Submit("batch-unknown", []disbursement.WorkerID{"wrk_001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
 	}
 	completed := waitForCompletedBatch(t, processor, "batch-unknown")
@@ -271,7 +271,7 @@ func TestProcessorBlocksAnotherAttemptWhenProviderOutcomeIsUnknown(t *testing.T)
 		t.Errorf("result error code = %q, want %q", got, want)
 	}
 
-	_, submitErr := processor.Submit("batch-unsafe-retry", []disbursement.WorkerID{"w-001"})
+	_, submitErr := processor.Submit("batch-unsafe-retry", []disbursement.WorkerID{"wrk_001"})
 	var unavailableError *disbursement.WorkersUnavailableError
 	if !errors.As(submitErr, &unavailableError) {
 		t.Fatalf("retry Submit() error = %v, want WorkersUnavailableError", submitErr)
@@ -298,18 +298,18 @@ func TestProcessorRejectsChangedWorkersForAnExistingBatchID(t *testing.T) {
 		t.Fatalf("NewProcessor() error = %v", err)
 	}
 
-	if _, err := processor.Submit("batch-conflict", []disbursement.WorkerID{"w-001"}); err != nil {
+	if _, err := processor.Submit("batch-conflict", []disbursement.WorkerID{"wrk_001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
 	}
 	_, submitErr := processor.Submit(
 		"batch-conflict",
-		[]disbursement.WorkerID{"w-001", "w-002"},
+		[]disbursement.WorkerID{"wrk_001", "wrk_002"},
 	)
 	var conflictError *disbursement.IdempotencyConflictError
 	if !errors.As(submitErr, &conflictError) {
 		t.Fatalf("second Submit() error = %v, want IdempotencyConflictError", submitErr)
 	}
-	if got := provider.callCount("w-002"); got != 0 {
+	if got := provider.callCount("wrk_002"); got != 0 {
 		t.Errorf("provider calls for changed worker = %d, want 0", got)
 	}
 
@@ -320,6 +320,45 @@ func TestProcessorRejectsChangedWorkersForAnExistingBatchID(t *testing.T) {
 	}
 	close(provider.release)
 	waitForCompletedBatch(t, processor, "batch-conflict")
+}
+
+func TestProcessorResetRestoresWorkersAndClearsCompletedBatches(t *testing.T) {
+	t.Parallel()
+
+	workers := firstSeedWorkers(t, 2)
+	provider := newCountingProvider()
+	processor, err := disbursement.NewProcessor(
+		context.Background(),
+		workers,
+		disbursement.ProcessorConfig{
+			Provider:        provider,
+			ProviderTimeout: time.Second,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
+
+	if _, err := processor.Submit("batch-before-reset", []disbursement.WorkerID{"wrk_001"}); err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	select {
+	case <-provider.started:
+	case <-time.After(time.Second):
+		t.Fatal("provider payment did not start")
+	}
+	close(provider.release)
+	waitForCompletedBatch(t, processor, "batch-before-reset")
+
+	if err := processor.ResetDemo(); err != nil {
+		t.Fatalf("ResetDemo() error = %v", err)
+	}
+	if got, want := len(processor.AvailableWorkers()), 2; got != want {
+		t.Errorf("available workers after reset = %d, want %d", got, want)
+	}
+	if _, found := processor.Batch("batch-before-reset"); found {
+		t.Error("Batch(batch-before-reset) found = true after reset, want false")
+	}
 }
 
 type gatedProvider struct {
