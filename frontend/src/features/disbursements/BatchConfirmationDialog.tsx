@@ -1,9 +1,7 @@
-import {
-  ArrowRight,
-  LoaderCircle,
-  ShieldCheck,
-  TriangleAlert,
-} from "lucide-react";
+import ArrowRight from "lucide-react/dist/esm/icons/arrow-right.mjs";
+import LoaderCircle from "lucide-react/dist/esm/icons/loader-circle.mjs";
+import ShieldCheck from "lucide-react/dist/esm/icons/shield-check.mjs";
+import TriangleAlert from "lucide-react/dist/esm/icons/triangle-alert.mjs";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import ShieldCheck from "lucide-react/dist/esm/icons/shield-check.mjs";
 
 import cadanaLogo from "@/assets/cadana-logo.jpeg";
 import { Badge } from "@/components/ui/badge";

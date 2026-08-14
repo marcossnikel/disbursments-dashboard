@@ -1,4 +1,6 @@
-import { ArrowRight, Eye, ShieldAlert } from "lucide-react";
+import ArrowRight from "lucide-react/dist/esm/icons/arrow-right.mjs";
+import Eye from "lucide-react/dist/esm/icons/eye.mjs";
+import ShieldAlert from "lucide-react/dist/esm/icons/shield-alert.mjs";
 
 import type { components } from "@/api/generated/schema";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";

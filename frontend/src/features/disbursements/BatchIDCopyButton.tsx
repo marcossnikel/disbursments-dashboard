@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Copy } from "lucide-react";
+import Check from "lucide-react/dist/esm/icons/check.mjs";
+import Copy from "lucide-react/dist/esm/icons/copy.mjs";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";

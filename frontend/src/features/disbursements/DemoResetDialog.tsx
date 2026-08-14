@@ -1,4 +1,5 @@
-import { LoaderCircle, RotateCcw } from "lucide-react";
+import LoaderCircle from "lucide-react/dist/esm/icons/loader-circle.mjs";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

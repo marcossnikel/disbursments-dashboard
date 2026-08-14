@@ -1,11 +1,9 @@
-import {
-  CheckCircle2,
-  CircleAlert,
-  LoaderCircle,
-  RotateCcw,
-  RefreshCw,
-  TriangleAlert,
-} from "lucide-react";
+import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2.mjs";
+import CircleAlert from "lucide-react/dist/esm/icons/circle-alert.mjs";
+import LoaderCircle from "lucide-react/dist/esm/icons/loader-circle.mjs";
+import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw.mjs";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
+import TriangleAlert from "lucide-react/dist/esm/icons/triangle-alert.mjs";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";

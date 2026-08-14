@@ -1,4 +1,5 @@
-import { CircleDollarSign, UsersRound } from "lucide-react";
+import CircleDollarSign from "lucide-react/dist/esm/icons/circle-dollar-sign.mjs";
+import UsersRound from "lucide-react/dist/esm/icons/users-round.mjs";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
