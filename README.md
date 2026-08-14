@@ -44,7 +44,7 @@ The payment attempt and the worker's payment obligation are related, but they ar
 
 A batch is reserved atomically: if any selected worker is unavailable, no provider call begins. The conflict response includes the worker, prior batch, disbursement, reason, and request IDs so the UI can explain exactly what happened rather than silently dropping a payment.
 
-## Design decisions
+## Key design decisions
 
 1. React and TypeScript keep the live-review surface in a framework I can explain fluently, while Go owns the payment rules and process lifecycle.
 2. `api/openapi.yaml` is the transport contract, and generated Go and TypeScript types prevent the two applications from inventing different payloads.
@@ -54,7 +54,10 @@ A batch is reserved atomically: if any selected worker is unavailable, no provid
 6. The exercise treats every simulated provider error as a terminal failure and releases the obligation for a newly confirmed retry; in production, an ambiguous network timeout would require provider idempotency and reconciliation before retrying.
 7. TanStack Query is the single owner of server state and polling, while local React state holds only the current selection and dialog feedback; Zustand would duplicate state without solving a current problem.
 8. Structured JSON access logs carry request ID, status, and duration, while payment lifecycle logs carry batch, disbursement, worker, provider transaction, status, and error identifiers.
-9. The deliberate trade-off is process-local state: it keeps this exercise readable, while production would persist idempotency and obligations before introducing queues, multiple instances, or automatic recovery.
+
+## Trade-off
+
+- State is deliberately process-local to keep this exercise readable. A production implementation would durably persist idempotency records and payment obligations before introducing queues, multiple instances, or automatic recovery.
 
 ## Repository map
 
