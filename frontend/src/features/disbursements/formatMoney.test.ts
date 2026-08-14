@@ -14,9 +14,9 @@ describe("money formatting", () => {
 
   it("keeps totals separate by currency", () => {
     const totals = totalsByCurrency([
-      { id: "w-001", name: "Ada", amount: "10.10", currency: "USD" },
-      { id: "w-002", name: "Linus", amount: "20.20", currency: "EUR" },
-      { id: "w-003", name: "Grace", amount: "0.30", currency: "USD" },
+      { id: "wrk_001", name: "Ada", amount: "10.10", currency: "USD" },
+      { id: "wrk_002", name: "Linus", amount: "20.20", currency: "EUR" },
+      { id: "wrk_003", name: "Grace", amount: "0.30", currency: "USD" },
     ]);
 
     expect(totals.get("USD")).toBe(1_040n);

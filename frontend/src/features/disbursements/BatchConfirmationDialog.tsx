@@ -5,7 +5,6 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,8 +60,8 @@ export function BatchConfirmationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(42rem,calc(100vh-2rem))] gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogHeader className="border-b px-6 py-5">
+      <DialogContent className="flex max-h-[min(42rem,calc(100vh-2rem))] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-lg">
+        <DialogHeader className="shrink-0 border-b px-6 py-5">
           <div className="mb-1 flex items-center gap-2 text-[#b93613]">
             <ShieldCheck aria-hidden="true" className="size-4" />
             <span className="text-xs font-semibold tracking-[0.12em] uppercase">
@@ -76,55 +75,86 @@ export function BatchConfirmationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-72 overflow-y-auto px-6 py-2">
-          {workers.map((worker) => (
-            <div
-              key={worker.id}
-              className="flex items-center justify-between gap-4 border-b py-3 last:border-0"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{worker.name}</p>
-                <p className="font-mono text-xs text-muted-foreground">
-                  {worker.id}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold tabular-nums">
-                  {formatMoney(worker.amount, worker.currency)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {worker.currency}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+        <div
+          className={
+            hasAvailabilityConflict
+              ? "hidden"
+              : "min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5"
+          }
+        >
+          <div>
+            <p className="font-semibold">
+              {workers.length} {workers.length === 1 ? "worker" : "workers"}{" "}
+              selected
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Totals stay separated by currency. No payment starts until you
+              confirm.
+            </p>
+          </div>
 
-        <div className="border-t bg-secondary px-6 py-4 text-secondary-foreground">
-          <p className="mb-2 text-xs font-medium tracking-[0.12em] text-white/50 uppercase">
-            Batch totals
-          </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-3 sm:grid-cols-2" aria-label="Batch totals">
             {[...totals].map(([currency, minorUnits]) => (
-              <Badge
+              <div
                 key={currency}
-                className="rounded-full bg-white/10 px-3 py-1 text-white"
+                className="rounded-xl border border-primary/15 bg-accent/50 p-4"
               >
-                {formatMinorUnits(minorUnits, currency)}
-              </Badge>
+                <p className="text-xs font-semibold tracking-[0.1em] text-accent-foreground uppercase">
+                  {currency} total
+                </p>
+                <p className="mt-2 text-xl font-semibold tabular-nums">
+                  {formatMinorUnits(minorUnits, currency)}
+                </p>
+              </div>
             ))}
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold tracking-[0.1em] text-muted-foreground uppercase">
+              Recipients
+            </p>
+            <div
+              aria-label="Recipients"
+              className="max-h-48 divide-y overflow-y-auto rounded-xl border"
+            >
+              {workers.map((worker) => (
+                <div
+                  key={worker.id}
+                  className="flex items-center justify-between gap-4 px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {worker.name}
+                    </p>
+                    <p className="font-mono text-xs text-muted-foreground">
+                      {worker.id}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold tabular-nums">
+                      {formatMoney(worker.amount, worker.currency)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {worker.currency}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         {hasAvailabilityConflict ? (
-          <BatchConflictNotice
-            unavailableWorkers={unavailableWorkers}
-            availableWorkerCount={availableWorkerCount}
-            requestID={requestID}
-            onCancel={() => onOpenChange(false)}
-            onViewPaymentDetails={onViewPaymentDetails}
-            onContinueWithAvailableWorkers={onContinueWithAvailableWorkers}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <BatchConflictNotice
+              unavailableWorkers={unavailableWorkers}
+              availableWorkerCount={availableWorkerCount}
+              requestID={requestID}
+              onCancel={() => onOpenChange(false)}
+              onViewPaymentDetails={onViewPaymentDetails}
+              onContinueWithAvailableWorkers={onContinueWithAvailableWorkers}
+            />
+          </div>
         ) : errorMessage ? (
           <div className="border-t px-6 py-4">
             <Alert
@@ -146,7 +176,7 @@ export function BatchConfirmationDialog({
         ) : null}
 
         {!hasAvailabilityConflict ? (
-          <DialogFooter className="m-0 rounded-none px-6 py-4">
+          <DialogFooter className="m-0 shrink-0 rounded-none border-t bg-muted/35 px-6 py-4">
             <DialogClose asChild>
               <Button variant="outline" disabled={isSubmitting}>
                 Go back

@@ -18,6 +18,7 @@ type WorkerSelectionProps = {
   workers: readonly Worker[];
   selectedWorkerIDs: ReadonlySet<string>;
   onToggleWorker: (workerID: string) => void;
+  onToggleAllWorkers: () => void;
   onReviewBatch: () => void;
 };
 
@@ -25,9 +26,12 @@ export function WorkerSelection({
   workers,
   selectedWorkerIDs,
   onToggleWorker,
+  onToggleAllWorkers,
   onReviewBatch,
 }: WorkerSelectionProps) {
   const selectedCount = selectedWorkerIDs.size;
+  const allWorkersSelected = selectedCount === workers.length;
+  const someWorkersSelected = selectedCount > 0 && !allWorkersSelected;
   const buttonLabel = `Disburse ${selectedCount} ${selectedCount === 1 ? "worker" : "workers"}`;
 
   return (
@@ -42,9 +46,29 @@ export function WorkerSelection({
             Choose workers for this batch
           </CardTitle>
         </div>
-        <Badge variant="secondary" className="w-fit rounded-full px-3 py-1">
-          {workers.length} available
-        </Badge>
+        <div className="flex flex-wrap items-center gap-4">
+          <label
+            htmlFor="select-all-workers"
+            className="flex cursor-pointer items-center gap-2 text-sm font-medium"
+          >
+            <Checkbox
+              id="select-all-workers"
+              checked={
+                allWorkersSelected
+                  ? true
+                  : someWorkersSelected
+                    ? "indeterminate"
+                    : false
+              }
+              onCheckedChange={onToggleAllWorkers}
+              aria-label="Select all workers"
+            />
+            {allWorkersSelected ? "Clear all" : "Select all"}
+          </label>
+          <Badge variant="secondary" className="w-fit rounded-full px-3 py-1">
+            {workers.length} available
+          </Badge>
+        </div>
       </CardHeader>
 
       <CardContent className="p-0">
@@ -56,7 +80,7 @@ export function WorkerSelection({
                   <span className="sr-only">Select</span>
                 </TableHead>
                 <TableHead>Worker</TableHead>
-                <TableHead>ID</TableHead>
+                <TableHead className="hidden sm:table-cell">ID</TableHead>
                 <TableHead>Currency</TableHead>
                 <TableHead className="pr-5 text-right sm:pr-6">
                   Amount
@@ -90,7 +114,7 @@ export function WorkerSelection({
                         </span>
                       </label>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="hidden font-mono text-xs text-muted-foreground sm:table-cell">
                       {worker.id}
                     </TableCell>
                     <TableCell>

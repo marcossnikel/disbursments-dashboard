@@ -43,11 +43,8 @@ export function BatchConflictNotice({
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold">{reasonMessage(worker)}</p>
-              <Badge
-                variant="outline"
-                className="rounded-full font-mono text-[0.65rem]"
-              >
-                {worker.reason}
+              <Badge variant="outline" className="rounded-full text-[0.65rem]">
+                {reasonLabel(worker.reason)}
               </Badge>
             </div>
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.68rem] text-muted-foreground">
@@ -96,5 +93,16 @@ function reasonMessage(worker: UnavailableWorker): string {
       return `${worker.worker_name} already has a payment in progress.`;
     case "outcome_unknown":
       return `${worker.worker_name}'s provider result is unknown. Another payment could pay this worker twice.`;
+  }
+}
+
+function reasonLabel(reason: UnavailableWorker["reason"]): string {
+  switch (reason) {
+    case "already_paid":
+      return "Already paid";
+    case "already_pending":
+      return "Payment pending";
+    case "outcome_unknown":
+      return "Outcome unknown";
   }
 }

@@ -36,27 +36,20 @@ export function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <section className="overflow-hidden rounded-3xl bg-secondary px-6 py-10 text-secondary-foreground shadow-2xl shadow-black/10 sm:px-10 sm:py-14">
-          <Badge className="mb-5 rounded-full bg-primary/15 px-3 py-1 text-[#ff7047] hover:bg-primary/15">
+        <section className="overflow-hidden rounded-2xl bg-secondary px-6 py-9 text-center text-secondary-foreground shadow-xl shadow-black/10 sm:px-10 sm:py-11">
+          <Badge className="mb-4 rounded-full bg-primary/15 px-3 py-1 text-[#ff7047] hover:bg-primary/15">
             Payment operations
           </Badge>
-          <h1 className="max-w-3xl text-4xl leading-[0.98] font-semibold tracking-[-0.05em] sm:text-6xl">
-            Payroll disbursements,
-            <span className="font-serif font-normal italic text-primary">
-              {" "}
-              made clear.
-            </span>
+          <h1 className="text-4xl leading-none font-semibold tracking-[-0.04em] sm:text-5xl">
+            Payroll disbursements
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-white/65">
-            Select pending workers, confirm one immutable batch, and follow
-            every provider result as it arrives.
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/65">
+            Review pending worker payments, confirm a batch, and monitor each
+            provider result.
           </p>
         </section>
 
-        <section
-          className="relative z-10 -mt-3 px-0 sm:-mt-8 sm:px-6"
-          aria-label="Disbursements"
-        >
+        <section className="mt-6" aria-label="Disbursements">
           <DisbursementDashboard />
         </section>
       </main>
