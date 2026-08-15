@@ -232,6 +232,7 @@ components:
         - amount
         - currency
         - status
+        - attempts
       properties:
         disbursement_id:
           type: string
@@ -247,6 +248,11 @@ components:
           $ref: "#/components/schemas/Currency"
         status:
           $ref: "#/components/schemas/DisbursementStatus"
+        attempts:
+          type: integer
+          minimum: 1
+          description: Provider calls started for this disbursement, including the initial call.
+          example: 2
         provider_txn_id:
           type: string
           description: Present only when status is success.

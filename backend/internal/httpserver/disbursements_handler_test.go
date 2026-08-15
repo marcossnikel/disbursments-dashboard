@@ -33,6 +33,9 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 		if got, want := result.Status, openapi.Pending; got != want {
 			t.Errorf("initial worker %q status = %q, want %q", result.WorkerID, got, want)
 		}
+		if got, want := result.Attempts, 1; got != want {
+			t.Errorf("initial worker %q attempts = %d, want %d", result.WorkerID, got, want)
+		}
 	}
 	historyResponse, err := testServer.Client().Get(testServer.URL + "/disbursements")
 	if err != nil {

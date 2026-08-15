@@ -29,9 +29,12 @@ const (
 
 // DisbursementResult is the current outcome of one worker payment.
 type DisbursementResult struct {
-	DisbursementID        DisbursementID
-	Worker                Worker
-	Status                DisbursementStatus
+	DisbursementID DisbursementID
+	Worker         Worker
+	Status         DisbursementStatus
+	// Attempts counts provider calls started for this logical payment.
+	Attempts int
+
 	ProviderTransactionID ProviderTransactionID
 	ErrorCode             ProviderErrorCode
 	ErrorMessage          string

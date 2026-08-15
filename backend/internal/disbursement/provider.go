@@ -5,7 +5,9 @@ import (
 	"fmt"
 )
 
-// DisbursementID uniquely identifies one internal payment attempt.
+// DisbursementID identifies one logical provider payment. It remains stable
+// across automatic attempts so a real provider adapter can use it as an
+// idempotency key.
 type DisbursementID string
 
 // ProviderTransactionID identifies a successful payment at the provider.
@@ -23,7 +25,8 @@ type PaymentResult struct {
 	ProviderTransactionID ProviderTransactionID
 }
 
-// PaymentProvider executes one payment attempt.
+// PaymentProvider executes one provider call. The processor may call it again
+// with the same request after a transient failure.
 type PaymentProvider interface {
 	Pay(ctx context.Context, request PaymentRequest) (PaymentResult, error)
 }

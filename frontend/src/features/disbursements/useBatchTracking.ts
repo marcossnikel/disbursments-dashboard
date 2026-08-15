@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import {
   batchQueryOptions,
+  type BatchSnapshot,
   disbursementBatchesQueryKey,
   disbursementHistoryQueryKey,
   workersQueryKey,
@@ -20,6 +21,28 @@ export function useBatchTracking() {
       void queryClient.invalidateQueries({ queryKey: workersQueryKey });
     }
   }, [batchQuery.data?.status, queryClient]);
+
+  useEffect(() => {
+    const batch = batchQuery.data;
+    if (!batch) {
+      return;
+    }
+
+    const createdAt =
+      batch.created_at ||
+      (batchQuery.dataUpdatedAt > 0
+        ? new Date(batchQuery.dataUpdatedAt).toISOString()
+        : null);
+    if (!createdAt) {
+      return;
+    }
+
+    queryClient.setQueryData<BatchSnapshot[]>(
+      disbursementHistoryQueryKey,
+      (history) =>
+        upsertBatchSnapshot(history, { ...batch, created_at: createdAt }),
+    );
+  }, [batchQuery.data, batchQuery.dataUpdatedAt, queryClient]);
 
   function trackBatch(batchID: string) {
     setActiveBatchID(batchID);
@@ -44,6 +67,22 @@ export function useBatchTracking() {
     stopTrackingBatch,
     trackBatch,
   };
+}
+
+function upsertBatchSnapshot(
+  history: readonly BatchSnapshot[] | undefined,
+  snapshot: BatchSnapshot,
+): BatchSnapshot[] {
+  const existingIndex = history?.findIndex(
+    (batch) => batch.batch_id === snapshot.batch_id,
+  );
+  if (existingIndex !== undefined && existingIndex >= 0 && history) {
+    return history.map((batch, index) =>
+      index === existingIndex ? snapshot : batch,
+    );
+  }
+
+  return [snapshot, ...(history ?? [])];
 }
 
 function readBatchIDFromURL(): string | null {

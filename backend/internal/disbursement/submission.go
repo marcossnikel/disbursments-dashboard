@@ -144,6 +144,7 @@ func (p *Processor) prepareSubmission(
 			DisbursementID: disbursementID,
 			Worker:         currentObligation.worker,
 			Status:         StatusPending,
+			Attempts:       1,
 		}
 		requests = append(requests, PaymentRequest{
 			DisbursementID: disbursementID,

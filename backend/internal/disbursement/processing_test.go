@@ -3,6 +3,7 @@ package disbursement_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,11 +15,231 @@ type resultProvider struct {
 	err    error
 }
 
+type scriptedProvider struct {
+	mu       sync.Mutex
+	errors   []error
+	requests []disbursement.PaymentRequest
+}
+
+type retryGateProvider struct {
+	mu                   sync.Mutex
+	requests             []disbursement.PaymentRequest
+	firstAttemptFinished chan struct{}
+	retryStarted         chan struct{}
+	releaseRetry         chan struct{}
+}
+
 func (provider resultProvider) Pay(
 	context.Context,
 	disbursement.PaymentRequest,
 ) (disbursement.PaymentResult, error) {
 	return provider.result, provider.err
+}
+
+func (provider *scriptedProvider) Pay(
+	_ context.Context,
+	request disbursement.PaymentRequest,
+) (disbursement.PaymentResult, error) {
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+
+	provider.requests = append(provider.requests, request)
+	callIndex := len(provider.requests) - 1
+	if callIndex < len(provider.errors) {
+		return disbursement.PaymentResult{}, provider.errors[callIndex]
+	}
+	return disbursement.PaymentResult{
+		ProviderTransactionID: "ptx-after-retry",
+	}, nil
+}
+
+func (provider *scriptedProvider) recordedRequests() []disbursement.PaymentRequest {
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+	return append([]disbursement.PaymentRequest(nil), provider.requests...)
+}
+
+func newRetryGateProvider() *retryGateProvider {
+	return &retryGateProvider{
+		firstAttemptFinished: make(chan struct{}),
+		retryStarted:         make(chan struct{}),
+		releaseRetry:         make(chan struct{}),
+	}
+}
+
+func (provider *retryGateProvider) Pay(
+	ctx context.Context,
+	request disbursement.PaymentRequest,
+) (disbursement.PaymentResult, error) {
+	provider.mu.Lock()
+	provider.requests = append(provider.requests, request)
+	attempt := len(provider.requests)
+	provider.mu.Unlock()
+
+	if attempt == 1 {
+		close(provider.firstAttemptFinished)
+		return disbursement.PaymentResult{}, &disbursement.ProviderFailure{
+			Code: disbursement.ProviderTimeout, Message: "temporary timeout",
+		}
+	}
+
+	close(provider.retryStarted)
+	select {
+	case <-provider.releaseRetry:
+		return disbursement.PaymentResult{ProviderTransactionID: "ptx-retry"}, nil
+	case <-ctx.Done():
+		return disbursement.PaymentResult{}, ctx.Err()
+	}
+}
+
+func TestProcessorAutomaticallyRetriesTransientFailureInSameBatch(t *testing.T) {
+	t.Parallel()
+
+	provider := &scriptedProvider{errors: []error{&disbursement.ProviderFailure{
+		Code: disbursement.ProviderTimeout, Message: "temporary timeout",
+	}}}
+	processor, err := disbursement.NewProcessor(
+		testWorkers(t, 1),
+		disbursement.ProcessorConfig{
+			Provider:            provider,
+			ProviderTimeout:     time.Second,
+			ProviderMaxAttempts: 2,
+			ProviderRetryDelay:  0,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
+
+	const batchID = disbursement.BatchID("batch-automatic-retry")
+	if _, err := processor.Submit(
+		context.Background(),
+		batchID,
+		[]disbursement.WorkerID{"w-001"},
+	); err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+
+	completed := waitForCompletedBatch(t, processor, batchID)
+	result := completed.Results[0]
+	if got, want := result.Status, disbursement.StatusSuccess; got != want {
+		t.Errorf("result status = %q, want %q", got, want)
+	}
+	if got, want := result.Attempts, 2; got != want {
+		t.Errorf("result attempts = %d, want %d", got, want)
+	}
+
+	requests := provider.recordedRequests()
+	if got, want := len(requests), 2; got != want {
+		t.Fatalf("provider call count = %d, want %d", got, want)
+	}
+	if got, want := requests[1].DisbursementID, requests[0].DisbursementID; got != want {
+		t.Errorf("retry disbursement ID = %q, want stable ID %q", got, want)
+	}
+
+	replay, err := processor.Submit(
+		context.Background(),
+		batchID,
+		[]disbursement.WorkerID{"w-001"},
+	)
+	if err != nil {
+		t.Fatalf("replayed Submit() error = %v", err)
+	}
+	if replay.Created {
+		t.Error("replayed Submit() Created = true, want false")
+	}
+	if got, want := len(provider.recordedRequests()), 2; got != want {
+		t.Errorf("provider calls after replay = %d, want %d", got, want)
+	}
+}
+
+func TestProcessorKeepsObligationReservedDuringAutomaticRetry(t *testing.T) {
+	t.Parallel()
+
+	provider := newRetryGateProvider()
+	processor, err := disbursement.NewProcessor(
+		testWorkers(t, 1),
+		disbursement.ProcessorConfig{
+			Provider:            provider,
+			ProviderTimeout:     time.Second,
+			ProviderMaxAttempts: 2,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
+
+	if _, err := processor.Submit(
+		context.Background(),
+		"batch-retrying",
+		[]disbursement.WorkerID{"w-001"},
+	); err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	<-provider.firstAttemptFinished
+	<-provider.retryStarted
+
+	_, competingErr := processor.Submit(
+		context.Background(),
+		"batch-competing",
+		[]disbursement.WorkerID{"w-001"},
+	)
+	var unavailableError *disbursement.WorkersUnavailableError
+	if !errors.As(competingErr, &unavailableError) {
+		t.Fatalf("competing Submit() error = %v, want WorkersUnavailableError", competingErr)
+	}
+	if got, want := unavailableError.Workers[0].Reason, disbursement.AlreadyPending; got != want {
+		t.Errorf("unavailable reason = %q, want %q", got, want)
+	}
+	if _, found := processor.Batch("batch-competing"); found {
+		t.Error("Batch(batch-competing) found = true, want false")
+	}
+
+	close(provider.releaseRetry)
+	completed := waitForCompletedBatch(t, processor, "batch-retrying")
+	if got, want := completed.Results[0].Status, disbursement.StatusSuccess; got != want {
+		t.Errorf("result status = %q, want %q", got, want)
+	}
+}
+
+func TestProcessorDoesNotAutomaticallyRetryProviderDecline(t *testing.T) {
+	t.Parallel()
+
+	provider := &scriptedProvider{errors: []error{&disbursement.ProviderFailure{
+		Code: disbursement.ProviderDeclined, Message: "payment was declined",
+	}}}
+	processor, err := disbursement.NewProcessor(
+		testWorkers(t, 1),
+		disbursement.ProcessorConfig{
+			Provider:            provider,
+			ProviderTimeout:     time.Second,
+			ProviderMaxAttempts: 2,
+			ProviderRetryDelay:  0,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
+
+	if _, err := processor.Submit(
+		context.Background(),
+		"batch-declined",
+		[]disbursement.WorkerID{"w-001"},
+	); err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+
+	completed := waitForCompletedBatch(t, processor, "batch-declined")
+	result := completed.Results[0]
+	if got, want := result.Status, disbursement.StatusFailed; got != want {
+		t.Errorf("result status = %q, want %q", got, want)
+	}
+	if got, want := result.Attempts, 1; got != want {
+		t.Errorf("result attempts = %d, want %d", got, want)
+	}
+	if got, want := len(provider.recordedRequests()), 1; got != want {
+		t.Errorf("provider call count = %d, want %d", got, want)
+	}
 }
 
 func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T) {
@@ -88,10 +309,24 @@ func TestProcessorExposesConcurrentPendingWorkAndIndependentResults(t *testing.T
 	}
 }
 
-func TestProcessorMakesTimedOutWorkerAvailableForANewAttempt(t *testing.T) {
+func TestProcessorReleasesWorkerAfterAutomaticRetriesAreExhausted(t *testing.T) {
 	t.Parallel()
 
-	processor := newTestProcessorWithTimeout(t, timeoutProvider{}, 1, 10*time.Millisecond)
+	provider := &scriptedProvider{errors: []error{
+		&disbursement.ProviderFailure{Code: disbursement.ProviderTimeout, Message: "first timeout"},
+		&disbursement.ProviderFailure{Code: disbursement.ProviderTimeout, Message: "second timeout"},
+	}}
+	processor, err := disbursement.NewProcessor(
+		testWorkers(t, 1),
+		disbursement.ProcessorConfig{
+			Provider:            provider,
+			ProviderTimeout:     time.Second,
+			ProviderMaxAttempts: 2,
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
 
 	if _, err := processor.Submit(context.Background(), "batch-timeout", []disbursement.WorkerID{"w-001"}); err != nil {
 		t.Fatalf("first Submit() error = %v", err)
@@ -103,6 +338,9 @@ func TestProcessorMakesTimedOutWorkerAvailableForANewAttempt(t *testing.T) {
 	if got, want := completed.Results[0].ErrorCode, disbursement.ProviderTimeout; got != want {
 		t.Errorf("result error code = %q, want %q", got, want)
 	}
+	if got, want := completed.Results[0].Attempts, 2; got != want {
+		t.Errorf("result attempts = %d, want %d", got, want)
+	}
 	if got, want := len(processor.AvailableWorkers()), 1; got != want {
 		t.Fatalf("available worker count = %d, want %d", got, want)
 	}
@@ -110,7 +348,21 @@ func TestProcessorMakesTimedOutWorkerAvailableForANewAttempt(t *testing.T) {
 	if _, err := processor.Submit(context.Background(), "batch-new-attempt", []disbursement.WorkerID{"w-001"}); err != nil {
 		t.Fatalf("new attempt Submit() error = %v", err)
 	}
-	waitForCompletedBatch(t, processor, "batch-new-attempt")
+	newAttempt := waitForCompletedBatch(t, processor, "batch-new-attempt")
+	if got, want := newAttempt.Results[0].Status, disbursement.StatusSuccess; got != want {
+		t.Errorf("new attempt status = %q, want %q", got, want)
+	}
+
+	requests := provider.recordedRequests()
+	if got, want := len(requests), 3; got != want {
+		t.Fatalf("provider call count = %d, want %d", got, want)
+	}
+	if got, want := requests[1].DisbursementID, requests[0].DisbursementID; got != want {
+		t.Errorf("automatic retry disbursement ID = %q, want %q", got, want)
+	}
+	if got, previous := requests[2].DisbursementID, requests[1].DisbursementID; got == previous {
+		t.Errorf("new batch disbursement ID = %q, want a new ID", got)
+	}
 }
 
 func TestProcessorRecordsProviderOutcomes(t *testing.T) {

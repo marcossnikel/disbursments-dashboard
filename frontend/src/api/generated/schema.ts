@@ -116,6 +116,11 @@ export interface components {
             currency: components["schemas"]["Currency"];
             status: components["schemas"]["DisbursementStatus"];
             /**
+             * @description Provider calls started for this disbursement, including the initial call.
+             * @example 2
+             */
+            attempts: number;
+            /**
              * @description Present only when status is success.
              * @example ptx-e41723a4
              */

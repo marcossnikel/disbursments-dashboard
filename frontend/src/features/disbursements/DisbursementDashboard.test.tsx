@@ -152,7 +152,7 @@ describe("DisbursementDashboard", () => {
     expect(historyReadCount).toBeGreaterThanOrEqual(1);
     expect(
       await screen.findByLabelText(
-        "Pending. The provider call is still in progress. No action is needed.",
+        "Pending. The provider call or an automatic retry is still in progress. No action is needed.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -272,6 +272,96 @@ describe("DisbursementDashboard", () => {
     expect(
       screen.queryByText("We couldn't load disbursement history"),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps every accepted batch in session history when the list endpoint is unavailable", async () => {
+    const submittedBatches: Array<{ batchID: string; workerID: string }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (request.method === "GET" && url.pathname === "/workers") {
+          return jsonResponse(workers);
+        }
+        if (request.method === "POST" && url.pathname === "/disbursements") {
+          const body = (await request.json()) as {
+            batch_id: string;
+            worker_ids: string[];
+          };
+          const workerID = body.worker_ids[0];
+          if (!workerID) {
+            throw new Error("Expected one selected worker");
+          }
+          submittedBatches.push({ batchID: body.batch_id, workerID });
+          return jsonResponse({ batch_id: body.batch_id }, { status: 202 });
+        }
+        if (request.method === "GET" && url.pathname === "/disbursements") {
+          return jsonResponse({}, { status: 405 });
+        }
+        if (
+          request.method === "GET" &&
+          url.pathname.startsWith("/disbursements/")
+        ) {
+          const batchID = url.pathname.replace("/disbursements/", "");
+          const submittedBatch = submittedBatches.find(
+            (batch) => batch.batchID === batchID,
+          );
+          const worker = workers.find(
+            (candidate) => candidate.id === submittedBatch?.workerID,
+          );
+          if (!submittedBatch || !worker) {
+            return new Response(null, { status: 404 });
+          }
+          return jsonResponse({
+            batch_id: batchID,
+            status: "completed",
+            results: [
+              {
+                disbursement_id: `disb-${worker.id}`,
+                worker_id: worker.id,
+                worker_name: worker.name,
+                amount: worker.amount,
+                currency: worker.currency,
+                status: "success",
+                provider_txn_id: `ptx-${worker.id}`,
+              },
+            ],
+          });
+        }
+        return new Response(null, { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+
+    renderDashboard();
+    await screen.findByText("Maya Thompson");
+
+    for (const workerName of ["Maya Thompson", "Daniel Kim"]) {
+      await user.click(
+        screen.getByRole("checkbox", { name: `Select ${workerName}` }),
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Disburse 1 worker" }),
+      );
+      await user.click(
+        screen.getByRole("button", { name: "Confirm and disburse" }),
+      );
+      await screen.findByText(
+        `Provider ptx-${workers.find((worker) => worker.name === workerName)?.id}`,
+      );
+    }
+
+    expect(submittedBatches).toHaveLength(2);
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    const history = await screen.findByRole("region", {
+      name: "Disbursement history",
+    });
+    expect(
+      within(history).getByText(submittedBatches[0]?.batchID ?? ""),
+    ).toBeInTheDocument();
+    expect(
+      within(history).getByText(submittedBatches[1]?.batchID ?? ""),
+    ).toBeInTheDocument();
   });
 
   it("restores an accepted batch from the URL after a refresh", async () => {
@@ -541,6 +631,7 @@ describe("DisbursementDashboard", () => {
                 amount: "1500.50",
                 currency: "USD",
                 status: "failed",
+                attempts: 2,
                 error_message: "Provider declined this disbursement.",
               },
               {
@@ -550,6 +641,7 @@ describe("DisbursementDashboard", () => {
                 amount: "2300.00",
                 currency: "EUR",
                 status: "success",
+                attempts: 2,
                 provider_txn_id: "ptx-success",
               },
             ],
@@ -563,6 +655,10 @@ describe("DisbursementDashboard", () => {
     renderDashboard();
 
     expect(await screen.findByText("Daniel Kim")).toBeInTheDocument();
+    expect(
+      screen.getByText("Automatic retry exhausted after 2 attempts."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Succeeded after 2 attempts.")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
         name: "Prepare retry for Daniel Kim",

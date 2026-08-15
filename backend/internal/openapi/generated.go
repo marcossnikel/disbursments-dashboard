@@ -155,7 +155,12 @@ type Currency string
 
 // DisbursementResult defines model for DisbursementResult.
 type DisbursementResult struct {
-	Amount   string   `json:"amount"`
+	Amount string `json:"amount"`
+
+	// Attempts Provider calls started for this disbursement, including the initial call.
+	//
+	// Example: 2
+	Attempts int      `json:"attempts"`
 	Currency Currency `json:"currency"`
 
 	// DisbursementID Example: disb-fc09316e

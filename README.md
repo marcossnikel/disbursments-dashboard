@@ -36,13 +36,15 @@ That command runs Go tests with the race detector, Go vet, frontend interaction 
 
 The payment attempt and the worker's payment obligation are related, but they are not the same lifecycle:
 
-| Attempt result | Obligation after the result    | Operator action                          |
-| -------------- | ------------------------------ | ---------------------------------------- |
-| `pending`      | Reserved by the accepted batch | Wait and keep polling                    |
-| `success`      | Paid                           | Never retry                              |
-| `failed`       | Available again                | Prepare a new batch and confirm it again |
+| Attempt result | Obligation after the result    | Operator action                                        |
+| -------------- | ------------------------------ | ------------------------------------------------------ |
+| `pending`      | Reserved by the accepted batch | Wait while the provider call or automatic retry runs   |
+| `success`      | Paid                           | Never retry                                            |
+| `failed`       | Available again                | Automatic retry is exhausted; confirm a new batch only |
 
 A batch is reserved atomically: if any selected worker is unavailable, no provider call begins. The conflict response includes the worker, prior batch, disbursement, reason, and request IDs so the UI can explain exactly what happened rather than silently dropping a payment.
+
+Transient provider errors and timeouts receive one automatic retry after 100 ms. The retry stays inside the original worker job, retains the same batch and disbursement IDs, and keeps the obligation reserved between calls. Provider declines are terminal and are never retried automatically. The UI exposes how many calls were attempted; an exhausted payment can still be prepared as a newly confirmed batch.
 
 ## Key design decisions
 
@@ -51,14 +53,15 @@ A batch is reserved atomically: if any selected worker is unavailable, no provid
 3. Money enters the API as a canonical decimal string and becomes a checked `int64` count of minor units plus currency in Go; the frontend uses `bigint`, so neither side performs monetary arithmetic with floating point.
 4. The processor locks only long enough to validate and reserve the full batch, then calls the provider concurrently outside the lock so partial failures remain independent.
 5. A replay of the same batch ID and canonical worker set returns the existing batch, while the same ID with different workers returns `409` and starts nothing.
-6. The exercise treats every simulated provider error as a terminal failure and releases the obligation for a newly confirmed retry; in production, an ambiguous network timeout would require provider idempotency and reconciliation before retrying.
+6. Automatic retries are transport attempts within the original immutable batch, not new submissions. Exact HTTP replays still return the stored batch and create no provider work; only a newly confirmed business retry receives a new batch and disbursement ID.
 7. TanStack Query is the single owner of server state and polling, while local React state holds only the current selection and dialog feedback.
 8. Structured JSON access logs carry request ID, status, and duration, while payment lifecycle logs carry batch, disbursement, worker, provider transaction, status, and error identifiers.
 9. `GET /disbursements` exposes immutable batch snapshots newest-first; the History tab polls only while at least one batch is processing and keeps pending work visible until it reaches a terminal state.
+10. Only transient `provider_error` and `provider_timeout` outcomes are retried. `provider_declined` is a business result, so repeating it automatically would add risk without a reasonable expectation of success.
 
 ## Trade-off
 
-- State is deliberately process-local to keep this exercise readable. A production implementation would durably persist idempotency records and payment obligations before introducing queues, multiple instances, or automatic recovery.
+- State and retry scheduling are deliberately process-local to keep this exercise readable. A production implementation would durably persist idempotency records, attempt state, and payment obligations before introducing queues, multiple instances, or crash recovery. The real provider adapter would also have to send the stable disbursement ID as its idempotency key and reconcile ambiguous timeouts; the stateless mock cannot prove those external guarantees. A production retry policy would normally use exponential backoff with jitter instead of one fixed delay.
 
 ## Repository map
 

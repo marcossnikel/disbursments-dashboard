@@ -11,9 +11,11 @@ import (
 
 // Processor owns worker availability and batch processing state.
 type Processor struct {
-	provider        PaymentProvider
-	providerTimeout time.Duration
-	logger          *slog.Logger
+	provider            PaymentProvider
+	providerTimeout     time.Duration
+	providerMaxAttempts int
+	providerRetryDelay  time.Duration
+	logger              *slog.Logger
 
 	mu          sync.RWMutex // protects obligations and batches
 	workerOrder []WorkerID
@@ -32,11 +34,13 @@ var (
 	ErrDemoResetInProgress = errors.New("cannot reset demo while a batch is processing")
 )
 
-// ProcessorConfig contains the dependencies and timeout used by a Processor.
+// ProcessorConfig contains the dependencies, timeout, and retry policy used by a Processor.
 type ProcessorConfig struct {
-	Provider        PaymentProvider
-	ProviderTimeout time.Duration
-	Logger          *slog.Logger
+	Provider            PaymentProvider
+	ProviderTimeout     time.Duration
+	ProviderMaxAttempts int
+	ProviderRetryDelay  time.Duration
+	Logger              *slog.Logger
 }
 
 // NewProcessor creates a processor for a fixed set of payment obligations.
@@ -59,12 +63,14 @@ func NewProcessor(
 	}
 
 	return &Processor{
-		provider:        config.Provider,
-		providerTimeout: config.ProviderTimeout,
-		logger:          logger,
-		workerOrder:     workerOrder,
-		obligations:     obligations,
-		batches:         make(map[BatchID]*storedBatch),
+		provider:            config.Provider,
+		providerTimeout:     config.ProviderTimeout,
+		providerMaxAttempts: config.ProviderMaxAttempts,
+		providerRetryDelay:  config.ProviderRetryDelay,
+		logger:              logger,
+		workerOrder:         workerOrder,
+		obligations:         obligations,
+		batches:             make(map[BatchID]*storedBatch),
 	}, nil
 }
 
@@ -86,6 +92,12 @@ func validateProcessorConfiguration(
 	}
 	if config.ProviderTimeout <= 0 {
 		return fmt.Errorf("%w: provider timeout must be positive", ErrInvalidProcessor)
+	}
+	if config.ProviderMaxAttempts <= 0 {
+		return fmt.Errorf("%w: provider max attempts must be positive", ErrInvalidProcessor)
+	}
+	if config.ProviderRetryDelay < 0 {
+		return fmt.Errorf("%w: provider retry delay cannot be negative", ErrInvalidProcessor)
 	}
 	return nil
 }

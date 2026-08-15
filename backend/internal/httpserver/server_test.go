@@ -115,7 +115,7 @@ func newTestProcessor(
 		t.Fatalf("Workers() error = %v", err)
 	}
 	processor, err := disbursement.NewProcessor(workers[:workerCount], disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second, Logger: logger,
+		Provider: provider, ProviderTimeout: time.Second, ProviderMaxAttempts: 1, Logger: logger,
 	})
 	if err != nil {
 		t.Fatalf("NewProcessor() error = %v", err)
