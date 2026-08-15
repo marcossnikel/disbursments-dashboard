@@ -52,7 +52,7 @@ A batch is reserved atomically: if any selected worker is unavailable, no provid
 4. The processor locks only long enough to validate and reserve the full batch, then calls the provider concurrently outside the lock so partial failures remain independent.
 5. A replay of the same batch ID and canonical worker set returns the existing batch, while the same ID with different workers returns `409` and starts nothing.
 6. The exercise treats every simulated provider error as a terminal failure and releases the obligation for a newly confirmed retry; in production, an ambiguous network timeout would require provider idempotency and reconciliation before retrying.
-7. TanStack Query is the single owner of server state and polling, while local React state holds only the current selection and dialog feedback; Zustand would duplicate state without solving a current problem.
+7. TanStack Query is the single owner of server state and polling, while local React state holds only the current selection and dialog feedback.
 8. Structured JSON access logs carry request ID, status, and duration, while payment lifecycle logs carry batch, disbursement, worker, provider transaction, status, and error identifiers.
 
 ## Trade-off
