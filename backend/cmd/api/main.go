@@ -26,7 +26,7 @@ const (
 
 	providerPaymentTimeout      = time.Second
 	providerAutomaticRetryDelay = 100 * time.Millisecond
-	providerMaxAttempts         = 2
+	providerMaxAttempts         = 5
 	serverShutdownTimeout       = 5 * time.Second
 	serverReadHeaderTimeout     = 5 * time.Second
 	serverRequestReadTimeout    = 10 * time.Second

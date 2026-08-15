@@ -31,8 +31,7 @@ type BatchProgressProps = {
 const statusDetails = {
   pending: {
     label: "Pending",
-    description:
-      "The provider call or an automatic retry is still in progress. No action is needed.",
+    description: "The provider call is still in progress. No action is needed.",
     className: "bg-status-warning-soft text-status-warning",
     icon: LoaderCircle,
   },
@@ -46,7 +45,7 @@ const statusDetails = {
   failed: {
     label: "Failed",
     description:
-      "The provider returned a terminal error or automatic retries were exhausted. You can prepare a new confirmed batch.",
+      "The provider returned a terminal error and no transaction ID. You can prepare a new confirmed batch.",
     className: "bg-status-danger-soft text-status-danger",
     icon: CircleAlert,
   },
@@ -146,10 +145,6 @@ export function BatchProgress({
           {batch.results.map((result) => {
             const details = statusDetails[result.status];
             const StatusIcon = details.icon;
-            const attemptSummary = formatAttemptSummary(
-              result.status,
-              result.attempts,
-            );
             return (
               <div
                 key={result.disbursement_id}
@@ -197,11 +192,6 @@ export function BatchProgress({
                       {result.error_message}
                     </p>
                   ) : null}
-                  {attemptSummary ? (
-                    <p className="mt-2 text-sm font-medium text-primary">
-                      {attemptSummary}
-                    </p>
-                  ) : null}
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
                   <p className="font-semibold tabular-nums">
@@ -239,25 +229,6 @@ export function BatchProgress({
       </CardContent>
     </Card>
   );
-}
-
-function formatAttemptSummary(
-  status: BatchSnapshot["results"][number]["status"],
-  reportedAttempts: number,
-): string | null {
-  const attempts = reportedAttempts || 1;
-  if (attempts <= 1) {
-    return null;
-  }
-
-  switch (status) {
-    case "pending":
-      return `Automatic retry attempt ${attempts} is in progress.`;
-    case "success":
-      return `Succeeded after ${attempts} attempts.`;
-    case "failed":
-      return `Automatic retry exhausted after ${attempts} attempts.`;
-  }
 }
 
 function formatUpdateTime(timestamp: number): string {

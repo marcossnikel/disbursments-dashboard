@@ -44,7 +44,7 @@ The payment attempt and the worker's payment obligation are related, but they ar
 
 A batch is reserved atomically: if any selected worker is unavailable, no provider call begins. The conflict response includes the worker, prior batch, disbursement, reason, and request IDs so the UI can explain exactly what happened rather than silently dropping a payment.
 
-Transient provider errors and timeouts receive one automatic retry after 100 ms. The retry stays inside the original worker job, retains the same batch and disbursement IDs, and keeps the obligation reserved between calls. Provider declines are terminal and are never retried automatically. The UI exposes how many calls were attempted; an exhausted payment can still be prepared as a newly confirmed batch.
+Transient provider errors and timeouts receive up to five provider attempts in total, separated by 100 ms. The retries stay inside the original worker job, retain the same batch and disbursement IDs, and keep the obligation reserved between calls. Provider declines are terminal and are never retried automatically. Retry counts remain a server concern in structured logs; the UI continues to expose only pending, success, or failed payment state. An exhausted payment can still be prepared as a newly confirmed batch.
 
 ## Key design decisions
 

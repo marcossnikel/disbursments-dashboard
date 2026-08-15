@@ -152,7 +152,7 @@ describe("DisbursementDashboard", () => {
     expect(historyReadCount).toBeGreaterThanOrEqual(1);
     expect(
       await screen.findByLabelText(
-        "Pending. The provider call or an automatic retry is still in progress. No action is needed.",
+        "Pending. The provider call is still in progress. No action is needed.",
       ),
     ).toBeInTheDocument();
     expect(
@@ -631,7 +631,6 @@ describe("DisbursementDashboard", () => {
                 amount: "1500.50",
                 currency: "USD",
                 status: "failed",
-                attempts: 2,
                 error_message: "Provider declined this disbursement.",
               },
               {
@@ -641,7 +640,6 @@ describe("DisbursementDashboard", () => {
                 amount: "2300.00",
                 currency: "EUR",
                 status: "success",
-                attempts: 2,
                 provider_txn_id: "ptx-success",
               },
             ],
@@ -655,10 +653,6 @@ describe("DisbursementDashboard", () => {
     renderDashboard();
 
     expect(await screen.findByText("Daniel Kim")).toBeInTheDocument();
-    expect(
-      screen.getByText("Automatic retry exhausted after 2 attempts."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Succeeded after 2 attempts.")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
         name: "Prepare retry for Daniel Kim",

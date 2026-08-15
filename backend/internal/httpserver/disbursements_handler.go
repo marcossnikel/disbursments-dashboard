@@ -144,7 +144,6 @@ func mapBatchSnapshot(snapshot disbursement.BatchSnapshot) openapi.BatchSnapshot
 	for _, result := range snapshot.Results {
 		mappedResult := openapi.DisbursementResult{
 			Amount:         result.Worker.Amount().String(),
-			Attempts:       result.Attempts,
 			Currency:       openapi.Currency(result.Worker.Amount().Currency()),
 			DisbursementID: string(result.DisbursementID),
 			Status:         openapi.DisbursementStatus(result.Status),

@@ -315,13 +315,16 @@ func TestProcessorReleasesWorkerAfterAutomaticRetriesAreExhausted(t *testing.T) 
 	provider := &scriptedProvider{errors: []error{
 		&disbursement.ProviderFailure{Code: disbursement.ProviderTimeout, Message: "first timeout"},
 		&disbursement.ProviderFailure{Code: disbursement.ProviderTimeout, Message: "second timeout"},
+		&disbursement.ProviderFailure{Code: disbursement.ProviderTimeout, Message: "third timeout"},
+		&disbursement.ProviderFailure{Code: disbursement.ProviderTimeout, Message: "fourth timeout"},
+		&disbursement.ProviderFailure{Code: disbursement.ProviderTimeout, Message: "fifth timeout"},
 	}}
 	processor, err := disbursement.NewProcessor(
 		testWorkers(t, 1),
 		disbursement.ProcessorConfig{
 			Provider:            provider,
 			ProviderTimeout:     time.Second,
-			ProviderMaxAttempts: 2,
+			ProviderMaxAttempts: 5,
 		},
 	)
 	if err != nil {
@@ -338,7 +341,7 @@ func TestProcessorReleasesWorkerAfterAutomaticRetriesAreExhausted(t *testing.T) 
 	if got, want := completed.Results[0].ErrorCode, disbursement.ProviderTimeout; got != want {
 		t.Errorf("result error code = %q, want %q", got, want)
 	}
-	if got, want := completed.Results[0].Attempts, 2; got != want {
+	if got, want := completed.Results[0].Attempts, 5; got != want {
 		t.Errorf("result attempts = %d, want %d", got, want)
 	}
 	if got, want := len(processor.AvailableWorkers()), 1; got != want {
@@ -354,13 +357,15 @@ func TestProcessorReleasesWorkerAfterAutomaticRetriesAreExhausted(t *testing.T) 
 	}
 
 	requests := provider.recordedRequests()
-	if got, want := len(requests), 3; got != want {
+	if got, want := len(requests), 6; got != want {
 		t.Fatalf("provider call count = %d, want %d", got, want)
 	}
-	if got, want := requests[1].DisbursementID, requests[0].DisbursementID; got != want {
-		t.Errorf("automatic retry disbursement ID = %q, want %q", got, want)
+	for attemptIndex := 1; attemptIndex < 5; attemptIndex++ {
+		if got, want := requests[attemptIndex].DisbursementID, requests[0].DisbursementID; got != want {
+			t.Errorf("automatic retry %d disbursement ID = %q, want %q", attemptIndex+1, got, want)
+		}
 	}
-	if got, previous := requests[2].DisbursementID, requests[1].DisbursementID; got == previous {
+	if got, previous := requests[5].DisbursementID, requests[4].DisbursementID; got == previous {
 		t.Errorf("new batch disbursement ID = %q, want a new ID", got)
 	}
 }
