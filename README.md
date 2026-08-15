@@ -1,6 +1,6 @@
 # Cadana Disbursement Console
 
-An internal operations dashboard for selecting pending worker payments, starting an asynchronous batch, and following every result without losing the identifiers needed to investigate it.
+An internal operations dashboard for selecting pending worker payments, starting an asynchronous batch, and following every result without losing the identifiers needed to investigate it. Accepted batches remain available in a process-local History tab with worker, amount, currency, and payment status details.
 
 ## Run locally
 
@@ -54,6 +54,7 @@ A batch is reserved atomically: if any selected worker is unavailable, no provid
 6. The exercise treats every simulated provider error as a terminal failure and releases the obligation for a newly confirmed retry; in production, an ambiguous network timeout would require provider idempotency and reconciliation before retrying.
 7. TanStack Query is the single owner of server state and polling, while local React state holds only the current selection and dialog feedback.
 8. Structured JSON access logs carry request ID, status, and duration, while payment lifecycle logs carry batch, disbursement, worker, provider transaction, status, and error identifiers.
+9. `GET /disbursements` exposes immutable batch snapshots newest-first; the History tab polls only while at least one batch is processing and keeps pending work visible until it reaches a terminal state.
 
 ## Trade-off
 

@@ -52,6 +52,7 @@ func New(processor *disbursement.Processor, logger *slog.Logger, config Config) 
 
 func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /workers", s.handleListWorkers)
+	s.mux.HandleFunc("GET /disbursements", s.handleListDisbursementBatches)
 	s.mux.HandleFunc("POST /disbursements", s.handleSubmitDisbursements)
 	s.mux.HandleFunc("GET /disbursements/{batch_id}", s.handleGetDisbursementBatch)
 	s.mux.HandleFunc("POST /demo/reset", s.handleResetDemo)

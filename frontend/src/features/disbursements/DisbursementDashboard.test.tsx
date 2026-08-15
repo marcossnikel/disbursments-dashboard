@@ -66,7 +66,9 @@ describe("DisbursementDashboard", () => {
 
   it("shows pending work immediately and polls until every result is terminal", async () => {
     let batchReadCount = 0;
+    let historyReadCount = 0;
     let workerReadCount = 0;
+    let submittedBatchID = "";
     vi.stubGlobal(
       "fetch",
       vi.fn(async (request: Request) => {
@@ -77,7 +79,12 @@ describe("DisbursementDashboard", () => {
         }
         if (request.method === "POST" && url.pathname === "/disbursements") {
           const body = (await request.json()) as { batch_id: string };
+          submittedBatchID = body.batch_id;
           return jsonResponse({ batch_id: body.batch_id }, { status: 202 });
+        }
+        if (request.method === "GET" && url.pathname === "/disbursements") {
+          historyReadCount++;
+          return jsonResponse({}, { status: 405 });
         }
         if (
           request.method === "GET" &&
@@ -125,6 +132,12 @@ describe("DisbursementDashboard", () => {
 
     renderDashboard();
     await screen.findByText("Maya Thompson");
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    expect(
+      await screen.findByText("No disbursement history yet"),
+    ).toBeInTheDocument();
+    expect(historyReadCount).toBe(1);
+    await user.click(screen.getByRole("tab", { name: "New disbursement" }));
     await user.click(
       screen.getByRole("checkbox", { name: "Select Maya Thompson" }),
     );
@@ -133,20 +146,34 @@ describe("DisbursementDashboard", () => {
       screen.getByRole("button", { name: "Confirm and disburse" }),
     );
 
-    expect(await screen.findByText("Pending")).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "New disbursement" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(historyReadCount).toBeGreaterThanOrEqual(1);
+    expect(
+      await screen.findByLabelText(
+        "Pending. The provider call is still in progress. No action is needed.",
+      ),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "About Pending" }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Copy batch ID" }),
     ).toBeInTheDocument();
+    const liveResults = screen
+      .getByRole("heading", { name: "Live payment results" })
+      .closest('[data-slot="card"]');
+    if (!(liveResults instanceof HTMLElement)) {
+      throw new Error("Live payment results card was not rendered");
+    }
     expect(
-      await screen.findByText("Success", {}, { timeout: 2_000 }),
+      await within(liveResults).findByText("Success", {}, { timeout: 2_000 }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "About Success" }),
     ).not.toBeInTheDocument();
-    await user.hover(screen.getByText("Success"));
+    await user.hover(within(liveResults).getByText("Success"));
     expect(
       await screen.findByText(
         "The provider confirmed the payment and returned a transaction ID.",
@@ -154,7 +181,97 @@ describe("DisbursementDashboard", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Provider ptx-001")).toBeInTheDocument();
     expect(screen.getByText("1", { selector: "dd" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    const history = await screen.findByRole("region", {
+      name: "Disbursement history",
+    });
+    expect(within(history).getByText(submittedBatchID)).toBeInTheDocument();
+    expect(within(history).getByText("$1,500.50")).toBeInTheDocument();
+    expect(
+      within(history).getByText("1 succeeded, 0 failed"),
+    ).toBeInTheDocument();
+    expect(
+      within(history).queryByText("Maya Thompson"),
+    ).not.toBeInTheDocument();
+
+    const search = within(history).getByRole("searchbox", {
+      name: "Search history by batch ID",
+    });
+    await user.type(search, submittedBatchID.slice(-6));
+    expect(within(history).getByText(submittedBatchID)).toBeInTheDocument();
+    await user.clear(search);
+    await user.type(search, "batch-that-does-not-exist");
+    expect(
+      within(history).getByText("No batches match this ID"),
+    ).toBeInTheDocument();
+    expect(
+      within(history).queryByText(submittedBatchID),
+    ).not.toBeInTheDocument();
+    await user.click(
+      within(history).getByRole("button", { name: "Clear search" }),
+    );
+
+    await user.click(
+      within(history).getByRole("button", { name: "Show details" }),
+    );
+    expect(await screen.findByText("Maya Thompson")).toBeInTheDocument();
+    const hideDetails = within(history).getByRole("button", {
+      name: "Hide details",
+    });
+    expect(hideDetails).toHaveAttribute("aria-expanded", "true");
+    await user.click(hideDetails);
+    expect(
+      screen.queryByRole("heading", { name: "Live payment results" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(history).getByRole("button", { name: "Show details" }),
+    ).toHaveAttribute("aria-expanded", "false");
     await waitFor(() => expect(workerReadCount).toBeGreaterThanOrEqual(3));
+  });
+
+  it("shows the same neutral empty state when history is empty or unavailable", async () => {
+    let historyResponseStatus = 200;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const url = new URL(request.url);
+        if (url.pathname === "/workers") {
+          return jsonResponse(workers);
+        }
+        if (url.pathname === "/disbursements") {
+          return historyResponseStatus === 200
+            ? jsonResponse([])
+            : jsonResponse({}, { status: historyResponseStatus });
+        }
+        return new Response(null, { status: 404 });
+      }),
+    );
+    const user = userEvent.setup();
+
+    const firstDashboard = renderDashboard();
+    await screen.findByText("Maya Thompson");
+    await user.click(screen.getByRole("tab", { name: "History" }));
+
+    expect(
+      await screen.findByText("No disbursement history yet"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("We couldn't load disbursement history"),
+    ).not.toBeInTheDocument();
+
+    firstDashboard.unmount();
+    historyResponseStatus = 500;
+    renderDashboard();
+    await screen.findByText("Maya Thompson");
+    await user.click(screen.getByRole("tab", { name: "History" }));
+
+    expect(
+      await screen.findByText("No disbursement history yet"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("We couldn't load disbursement history"),
+    ).not.toBeInTheDocument();
   });
 
   it("restores an accepted batch from the URL after a refresh", async () => {
@@ -186,14 +303,24 @@ describe("DisbursementDashboard", () => {
         return new Response(null, { status: 404 });
       }),
     );
+    const user = userEvent.setup();
 
     renderDashboard();
 
     expect(await screen.findByText("Batch complete")).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "New disbursement" }),
+    ).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Provider ptx-restored")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Confirm and disburse/ }),
     ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    const history = await screen.findByRole("region", {
+      name: "Disbursement history",
+    });
+    expect(within(history).getByText("batch-restored")).toBeInTheDocument();
   });
 
   it("can stop tracking an unavailable batch without implying cancellation", async () => {
@@ -379,6 +506,9 @@ describe("DisbursementDashboard", () => {
     );
 
     expect(await screen.findByText("Batch complete")).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole("tab", { name: "New disbursement" }),
+    );
     expect(
       screen.queryByRole("checkbox", { name: "Select Maya Thompson" }),
     ).not.toBeInTheDocument();
@@ -486,6 +616,9 @@ describe("DisbursementDashboard", () => {
 
     renderDashboard();
 
+    await user.click(
+      await screen.findByRole("tab", { name: "New disbursement" }),
+    );
     expect(
       await screen.findByText("No pending disbursements"),
     ).toBeInTheDocument();

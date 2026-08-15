@@ -19,6 +19,7 @@ type Processor struct {
 	workerOrder []WorkerID
 	obligations map[WorkerID]*paymentObligation
 	batches     map[BatchID]*storedBatch
+	batchOrder  []BatchID
 	jobs        sync.WaitGroup
 }
 

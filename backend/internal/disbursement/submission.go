@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 )
 
 type preparedSubmission struct {
@@ -157,11 +158,13 @@ func (p *Processor) prepareSubmission(
 
 	p.batches[batchID] = &storedBatch{
 		id:                 batchID,
+		createdAt:          time.Now().UTC(),
 		canonicalWorkerIDs: canonicalWorkerIDs,
 		resultOrder:        slices.Clone(workerIDs),
 		results:            results,
 		pendingCount:       len(workerIDs),
 	}
+	p.batchOrder = append(p.batchOrder, batchID)
 	return preparedSubmission{requests: requests, created: true}, nil
 }
 

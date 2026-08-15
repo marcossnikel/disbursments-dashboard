@@ -29,4 +29,7 @@ func TestProcessorResetRestoresWorkersAndClearsCompletedBatches(t *testing.T) {
 	if _, found := processor.Batch("batch-before-reset"); found {
 		t.Error("Batch(batch-before-reset) found = true after reset, want false")
 	}
+	if got := len(processor.Batches()); got != 0 {
+		t.Errorf("Batches() length after reset = %d, want 0", got)
+	}
 }

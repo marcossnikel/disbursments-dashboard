@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   batchQueryOptions,
   disbursementBatchesQueryKey,
+  disbursementHistoryQueryKey,
   workersQueryKey,
 } from "@/features/disbursements/queries";
 
@@ -33,6 +34,7 @@ export function useBatchTracking() {
   function clearBatchHistory() {
     stopTrackingBatch();
     queryClient.removeQueries({ queryKey: disbursementBatchesQueryKey });
+    queryClient.removeQueries({ queryKey: disbursementHistoryQueryKey });
   }
 
   return {

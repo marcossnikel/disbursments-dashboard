@@ -70,6 +70,16 @@ func (s *Server) handleGetDisbursementBatch(responseWriter http.ResponseWriter, 
 	s.writeJSON(responseWriter, http.StatusOK, mapBatchSnapshot(snapshot))
 }
 
+func (s *Server) handleListDisbursementBatches(responseWriter http.ResponseWriter, request *http.Request) {
+	snapshots := s.processor.Batches()
+	mappedSnapshots := make([]openapi.BatchSnapshot, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		mappedSnapshots = append(mappedSnapshots, mapBatchSnapshot(snapshot))
+	}
+
+	s.writeJSON(responseWriter, http.StatusOK, mappedSnapshots)
+}
+
 func (s *Server) writeSubmissionError(
 	responseWriter http.ResponseWriter,
 	request *http.Request,
@@ -156,8 +166,9 @@ func mapBatchSnapshot(snapshot disbursement.BatchSnapshot) openapi.BatchSnapshot
 	}
 
 	return openapi.BatchSnapshot{
-		BatchID: string(snapshot.BatchID),
-		Status:  openapi.BatchStatus(snapshot.Status),
-		Results: results,
+		BatchID:   string(snapshot.BatchID),
+		CreatedAt: snapshot.CreatedAt,
+		Status:    openapi.BatchStatus(snapshot.Status),
+		Results:   results,
 	}
 }

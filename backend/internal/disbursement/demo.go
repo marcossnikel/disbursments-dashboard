@@ -19,6 +19,7 @@ func (p *Processor) ResetDemo() error {
 		currentObligation.disbursementID = ""
 	}
 	p.batches = make(map[BatchID]*storedBatch)
+	p.batchOrder = nil
 	p.logger.Info("demo state reset", "worker_count", len(p.obligations))
 
 	return nil

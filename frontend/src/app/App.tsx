@@ -36,14 +36,14 @@ export function App() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
-        <section className="overflow-hidden rounded-2xl bg-secondary px-6 py-9 text-center text-secondary-foreground shadow-xl shadow-black/10 sm:px-10 sm:py-11">
-          <Badge className="mb-4 rounded-full bg-primary/15 px-3 py-1 text-[#ff7047] hover:bg-primary/15">
+        <section className="overflow-hidden rounded-2xl border border-primary/10 bg-white/90 px-6 py-9 text-center shadow-xl shadow-primary/5 sm:px-10 sm:py-11">
+          <Badge className="mb-4 rounded-full bg-accent px-3 py-1 text-accent-foreground hover:bg-accent">
             Payment operations
           </Badge>
           <h1 className="text-4xl leading-none font-semibold tracking-[-0.04em] sm:text-5xl">
             Payroll disbursements
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/65">
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
             Review pending worker payments, confirm a batch, and monitor each
             provider result.
           </p>

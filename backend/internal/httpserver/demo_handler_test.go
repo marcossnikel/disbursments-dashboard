@@ -58,4 +58,14 @@ func TestServerResetsCompletedDemoStateButRejectsAResetDuringProcessing(t *testi
 		t.Fatalf("GET reset batch status = %d, want %d", got, want)
 	}
 	missingBatch.Body.Close()
+
+	historyResponse, err := testServer.Client().Get(testServer.URL + "/disbursements")
+	if err != nil {
+		t.Fatalf("GET /disbursements after reset error = %v", err)
+	}
+	var history []openapi.BatchSnapshot
+	decodeJSON(t, historyResponse, &history)
+	if got := len(history); got != 0 {
+		t.Errorf("history length after reset = %d, want 0", got)
+	}
 }

@@ -2,6 +2,7 @@ import type { components } from "@/api/generated/schema";
 
 export type Currency = components["schemas"]["Currency"];
 export type Worker = components["schemas"]["Worker"];
+type MoneyAmount = Pick<Worker, "amount" | "currency">;
 
 const decimalAmountPattern = /^(\d+)\.(\d{2})$/;
 
@@ -9,14 +10,14 @@ export function formatMoney(amount: string, currency: Currency): string {
   return formatMinorUnits(parseMinorUnits(amount), currency);
 }
 
-export function totalsByCurrency(
-  workers: readonly Worker[],
+export function totalsByCurrency<T extends MoneyAmount>(
+  amounts: readonly T[],
 ): Map<Currency, bigint> {
   const totals = new Map<Currency, bigint>();
-  for (const worker of workers) {
+  for (const amount of amounts) {
     totals.set(
-      worker.currency,
-      (totals.get(worker.currency) ?? 0n) + parseMinorUnits(worker.amount),
+      amount.currency,
+      (totals.get(amount.currency) ?? 0n) + parseMinorUnits(amount.amount),
     );
   }
   return totals;
