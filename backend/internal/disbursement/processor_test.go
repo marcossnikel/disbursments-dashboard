@@ -88,8 +88,9 @@ func newTestProcessorWithTimeout(
 	processor, err := disbursement.NewProcessor(
 		testWorkers(t, workerCount),
 		disbursement.ProcessorConfig{
-			Provider:        provider,
-			ProviderTimeout: providerTimeout,
+			Provider:            provider,
+			ProviderTimeout:     providerTimeout,
+			ProviderMaxAttempts: 1,
 		},
 	)
 	if err != nil {

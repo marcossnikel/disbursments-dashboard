@@ -33,9 +33,9 @@ export function BatchIDCopyButton({ batchID }: BatchIDCopyButtonProps) {
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="sm"
-      className="h-8 gap-2 rounded-lg px-2 font-mono text-xs text-white/70 hover:bg-white/10 hover:text-white"
+      className="h-8 gap-2 rounded-lg bg-white px-2 font-mono text-xs text-muted-foreground hover:text-foreground"
       onClick={() => void copyBatchID()}
       aria-label={isCopied ? "Batch ID copied" : "Copy batch ID"}
     >

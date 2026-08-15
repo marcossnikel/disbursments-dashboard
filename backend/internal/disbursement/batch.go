@@ -1,5 +1,7 @@
 package disbursement
 
+import "time"
+
 // BatchID uniquely identifies one idempotent submission.
 type BatchID string
 
@@ -27,9 +29,12 @@ const (
 
 // DisbursementResult is the current outcome of one worker payment.
 type DisbursementResult struct {
-	DisbursementID        DisbursementID
-	Worker                Worker
-	Status                DisbursementStatus
+	DisbursementID DisbursementID
+	Worker         Worker
+	Status         DisbursementStatus
+	// Attempts counts provider calls started for this logical payment.
+	Attempts int
+
 	ProviderTransactionID ProviderTransactionID
 	ErrorCode             ProviderErrorCode
 	ErrorMessage          string
@@ -37,13 +42,15 @@ type DisbursementResult struct {
 
 // BatchSnapshot is a point-in-time copy safe for callers to read.
 type BatchSnapshot struct {
-	BatchID BatchID
-	Status  BatchStatus
-	Results []DisbursementResult
+	BatchID   BatchID
+	CreatedAt time.Time
+	Status    BatchStatus
+	Results   []DisbursementResult
 }
 
 type storedBatch struct {
 	id                 BatchID
+	createdAt          time.Time
 	canonicalWorkerIDs []WorkerID
 	resultOrder        []WorkerID
 	results            map[WorkerID]*DisbursementResult
@@ -60,6 +67,22 @@ func (p *Processor) Batch(batchID BatchID) (BatchSnapshot, bool) {
 		return BatchSnapshot{}, false
 	}
 
+	return snapshotBatch(storedBatch), true
+}
+
+// Batches returns snapshots from newest to oldest.
+func (p *Processor) Batches() []BatchSnapshot {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	snapshots := make([]BatchSnapshot, 0, len(p.batchOrder))
+	for index := len(p.batchOrder) - 1; index >= 0; index-- {
+		snapshots = append(snapshots, snapshotBatch(p.batches[p.batchOrder[index]]))
+	}
+	return snapshots
+}
+
+func snapshotBatch(storedBatch *storedBatch) BatchSnapshot {
 	status := BatchProcessing
 	if storedBatch.pendingCount == 0 {
 		status = BatchCompleted
@@ -70,8 +93,9 @@ func (p *Processor) Batch(batchID BatchID) (BatchSnapshot, bool) {
 	}
 
 	return BatchSnapshot{
-		BatchID: storedBatch.id,
-		Status:  status,
-		Results: results,
-	}, true
+		BatchID:   storedBatch.id,
+		CreatedAt: storedBatch.createdAt,
+		Status:    status,
+		Results:   results,
+	}
 }

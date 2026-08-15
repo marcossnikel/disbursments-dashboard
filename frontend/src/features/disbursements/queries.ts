@@ -13,6 +13,7 @@ export type SubmitBatchInput = {
 
 export const workersQueryKey = ["workers"] as const;
 export const disbursementBatchesQueryKey = ["disbursement-batch"] as const;
+export const disbursementHistoryQueryKey = ["disbursement-history"] as const;
 const batchPollingIntervalMilliseconds = 400;
 
 export function workersQueryOptions() {
@@ -35,11 +36,31 @@ export function batchQueryOptions(batchID: string | null) {
   });
 }
 
+export function historyQueryOptions(enabled: boolean) {
+  return queryOptions({
+    queryKey: disbursementHistoryQueryKey,
+    queryFn: listBatches,
+    enabled,
+    refetchInterval: (query) =>
+      nextHistoryRefreshInterval(query.state.data, query.state.error !== null),
+  });
+}
+
 export function nextBatchRefreshInterval(
   status: BatchSnapshot["status"] | undefined,
   hasError: boolean,
 ): false | number {
   if (hasError || status === "completed") {
+    return false;
+  }
+  return batchPollingIntervalMilliseconds;
+}
+
+export function nextHistoryRefreshInterval(
+  batches: readonly BatchSnapshot[] | undefined,
+  hasError: boolean,
+): false | number {
+  if (hasError || !batches?.some((batch) => batch.status === "processing")) {
     return false;
   }
   return batchPollingIntervalMilliseconds;
@@ -74,6 +95,14 @@ export function createBatchID(): string {
 
 async function listWorkers(): Promise<Worker[]> {
   const { data, error, response } = await apiClient.GET("/workers");
+  if (!response.ok || !data) {
+    throw apiError(response, error);
+  }
+  return data;
+}
+
+async function listBatches(): Promise<BatchSnapshot[]> {
+  const { data, error, response } = await apiClient.GET("/disbursements");
   if (!response.ok || !data) {
     throw apiError(response, error);
   }

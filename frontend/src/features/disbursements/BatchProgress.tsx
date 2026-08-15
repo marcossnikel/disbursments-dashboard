@@ -45,7 +45,7 @@ const statusDetails = {
   failed: {
     label: "Failed",
     description:
-      "The mock provider returned an error and no transaction ID. You can prepare a new confirmed attempt.",
+      "The provider returned a terminal error and no transaction ID. You can prepare a new confirmed batch.",
     className: "bg-status-danger-soft text-status-danger",
     icon: CircleAlert,
   },
@@ -68,9 +68,9 @@ export function BatchProgress({
       : Math.round((completedCount / batch.results.length) * 100);
 
   return (
-    <Card className="mb-6 overflow-hidden border-0 bg-secondary text-secondary-foreground shadow-2xl shadow-black/15">
+    <Card className="mb-6 overflow-hidden border-black/5 bg-white shadow-xl shadow-black/5">
       <CardContent className="p-0">
-        <div className="flex flex-col gap-5 border-b border-white/10 px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-5 border-b bg-accent/35 px-5 py-5 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
@@ -94,14 +94,14 @@ export function BatchProgress({
           </div>
 
           <div>
-            <div className="mb-2 flex items-center justify-between text-xs text-white/55">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>{completedCount} terminal results</span>
               <span>{completionPercentage}%</span>
             </div>
             <Progress
               value={completionPercentage}
               aria-label="Batch completion"
-              className="h-1.5 bg-white/10"
+              className="h-1.5 bg-primary/10"
             />
           </div>
 
@@ -113,14 +113,14 @@ export function BatchProgress({
         </div>
 
         {refreshFailed ? (
-          <div className="border-b border-white/10 px-5 py-4 sm:px-6">
-            <Alert className="border-status-warning/20 bg-status-warning/10 text-white">
+          <div className="border-b px-5 py-4 sm:px-6">
+            <Alert className="border-status-warning/20 bg-status-warning-soft">
               <RefreshCw
                 aria-hidden="true"
                 className={cn(isRefreshing && "animate-spin")}
               />
               <AlertTitle>The latest refresh failed</AlertTitle>
-              <AlertDescription className="flex flex-col gap-2 text-white/65 sm:flex-row sm:items-center sm:justify-between">
+              <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span>
                   The results below were last confirmed at{" "}
                   <time dateTime={new Date(lastUpdatedAt).toISOString()}>
@@ -141,7 +141,7 @@ export function BatchProgress({
           </div>
         ) : null}
 
-        <div className="divide-y divide-white/10">
+        <div className="divide-y">
           {batch.results.map((result) => {
             const details = statusDetails[result.status];
             const StatusIcon = details.icon;
@@ -152,16 +152,14 @@ export function BatchProgress({
               >
                 <div className="min-w-0">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-white">
-                      {result.worker_name}
-                    </p>
+                    <p className="font-medium">{result.worker_name}</p>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Badge
                           tabIndex={0}
                           aria-label={`${details.label}. ${details.description}`}
                           className={cn(
-                            "cursor-help rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+                            "cursor-help rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                             details.className,
                           )}
                         >
@@ -180,31 +178,33 @@ export function BatchProgress({
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.7rem] text-white/55">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[0.7rem] text-muted-foreground">
                     <span>Worker {result.worker_id}</span>
                     <span>Disbursement {result.disbursement_id}</span>
                   </div>
                   {result.provider_txn_id ? (
-                    <p className="mt-2 font-mono text-xs text-white/65">
+                    <p className="mt-2 font-mono text-xs text-muted-foreground">
                       Provider {result.provider_txn_id}
                     </p>
                   ) : null}
                   {result.error_message ? (
-                    <p className="mt-2 text-sm text-white/65">
+                    <p className="mt-2 text-sm text-muted-foreground">
                       {result.error_message}
                     </p>
                   ) : null}
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
-                  <p className="font-semibold text-white tabular-nums">
+                  <p className="font-semibold tabular-nums">
                     {formatMoney(result.amount, result.currency)}
                   </p>
-                  <p className="text-xs text-white/55">{result.currency}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {result.currency}
+                  </p>
                   {result.status === "failed" ? (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="mt-1 border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                      className="mt-1"
                       aria-label={`Prepare retry for ${result.worker_name}`}
                       disabled={retryingWorkerID !== null}
                       onClick={() => onPrepareRetry(result.worker_id)}
@@ -241,11 +241,9 @@ function formatUpdateTime(timestamp: number): string {
 
 function SummaryCount({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
-      <dt className="text-[0.7rem] text-white/60">{label}</dt>
-      <dd className="mt-1 text-xl font-semibold text-white tabular-nums">
-        {value}
-      </dd>
+    <div className="rounded-xl border bg-white/80 px-3 py-3">
+      <dt className="text-[0.7rem] text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-xl font-semibold tabular-nums">{value}</dd>
     </div>
   );
 }

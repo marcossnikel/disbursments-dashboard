@@ -34,6 +34,27 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 			t.Errorf("initial worker %q status = %q, want %q", result.WorkerID, got, want)
 		}
 	}
+	historyResponse, err := testServer.Client().Get(testServer.URL + "/disbursements")
+	if err != nil {
+		t.Fatalf("GET /disbursements error = %v", err)
+	}
+	var history []openapi.BatchSnapshot
+	decodeJSON(t, historyResponse, &history)
+	if got, want := len(history), 1; got != want {
+		t.Fatalf("history length = %d, want %d", got, want)
+	}
+	if history[0].CreatedAt.IsZero() {
+		t.Error("history creation time is zero")
+	}
+	if got, want := history[0].Status, openapi.Processing; got != want {
+		t.Errorf("history batch status = %q, want %q", got, want)
+	}
+	if got, want := history[0].Results[0].Amount, "1500.50"; got != want {
+		t.Errorf("history result amount = %q, want %q", got, want)
+	}
+	if got, want := history[0].Results[0].Currency, openapi.USD; got != want {
+		t.Errorf("history result currency = %q, want %q", got, want)
+	}
 	waitForPaymentStarts(t, provider.started, 2)
 	close(provider.release)
 

@@ -25,6 +25,8 @@ const (
 	defaultFrontendOrigin = "http://localhost:5173"
 
 	providerPaymentTimeout      = time.Second
+	providerAutomaticRetryDelay = 100 * time.Millisecond
+	providerMaxAttempts         = 5
 	serverShutdownTimeout       = 5 * time.Second
 	serverReadHeaderTimeout     = 5 * time.Second
 	serverRequestReadTimeout    = 10 * time.Second
@@ -52,9 +54,11 @@ func run(shutdownSignal context.Context, logger *slog.Logger) error {
 	processor, err := disbursement.NewProcessor(
 		workers,
 		disbursement.ProcessorConfig{
-			Provider:        mockpayment.New(),
-			ProviderTimeout: providerPaymentTimeout,
-			Logger:          logger,
+			Provider:            mockpayment.New(),
+			ProviderTimeout:     providerPaymentTimeout,
+			ProviderMaxAttempts: providerMaxAttempts,
+			ProviderRetryDelay:  providerAutomaticRetryDelay,
+			Logger:              logger,
 		},
 	)
 	if err != nil {

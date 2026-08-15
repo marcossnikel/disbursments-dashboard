@@ -30,8 +30,9 @@ func TestNewProcessorRejectsInvalidConfiguration(t *testing.T) {
 	duplicateWorkers := append([]disbursement.Worker(nil), validWorkers...)
 	duplicateWorkers[1] = duplicateWorkers[0]
 	validConfig := disbursement.ProcessorConfig{
-		Provider:        timeoutProvider{},
-		ProviderTimeout: time.Second,
+		Provider:            timeoutProvider{},
+		ProviderTimeout:     time.Second,
+		ProviderMaxAttempts: 1,
 	}
 	testCases := []struct {
 		name    string
@@ -39,9 +40,11 @@ func TestNewProcessorRejectsInvalidConfiguration(t *testing.T) {
 		config  disbursement.ProcessorConfig
 	}{
 		{name: "missing workers", config: validConfig},
-		{name: "missing provider", workers: validWorkers, config: disbursement.ProcessorConfig{ProviderTimeout: time.Second}},
-		{name: "zero provider timeout", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}}},
-		{name: "negative provider timeout", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}, ProviderTimeout: -time.Second}},
+		{name: "missing provider", workers: validWorkers, config: disbursement.ProcessorConfig{ProviderTimeout: time.Second, ProviderMaxAttempts: 1}},
+		{name: "zero provider timeout", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}, ProviderMaxAttempts: 1}},
+		{name: "negative provider timeout", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}, ProviderTimeout: -time.Second, ProviderMaxAttempts: 1}},
+		{name: "zero provider max attempts", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}, ProviderTimeout: time.Second}},
+		{name: "negative provider retry delay", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}, ProviderTimeout: time.Second, ProviderMaxAttempts: 1, ProviderRetryDelay: -time.Second}},
 		{name: "duplicate worker ID", workers: duplicateWorkers, config: validConfig},
 	}
 

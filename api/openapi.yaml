@@ -25,6 +25,23 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
   /disbursements:
+    get:
+      operationId: listDisbursementBatches
+      summary: List disbursement batches from newest to oldest
+      responses:
+        "200":
+          description: Process-local disbursement history
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BatchSnapshot"
+        "500":
+          $ref: "#/components/responses/InternalError"
     post:
       operationId: submitDisbursements
       summary: Submit an immutable disbursement batch
@@ -244,10 +261,14 @@ components:
     BatchSnapshot:
       type: object
       additionalProperties: false
-      required: [batch_id, status, results]
+      required: [batch_id, created_at, status, results]
       properties:
         batch_id:
           $ref: "#/components/schemas/BatchID"
+        created_at:
+          type: string
+          format: date-time
+          description: When the batch was accepted by this process.
         status:
           $ref: "#/components/schemas/BatchStatus"
         results:

@@ -28,7 +28,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List disbursement batches from newest to oldest */
+        get: operations["listDisbursementBatches"];
         put?: never;
         /** Submit an immutable disbursement batch */
         post: operations["submitDisbursements"];
@@ -126,6 +127,11 @@ export interface components {
         };
         BatchSnapshot: {
             batch_id: components["schemas"]["BatchID"];
+            /**
+             * Format: date-time
+             * @description When the batch was accepted by this process.
+             */
+            created_at: string;
             status: components["schemas"]["BatchStatus"];
             results: components["schemas"]["DisbursementResult"][];
         };
@@ -198,6 +204,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Worker"][];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listDisbursementBatches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Process-local disbursement history */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchSnapshot"][];
                 };
             };
             500: components["responses"]["InternalError"];

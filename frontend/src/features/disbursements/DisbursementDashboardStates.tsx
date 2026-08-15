@@ -125,7 +125,7 @@ export function NoPendingDisbursements({
 
 function BatchLoadingState() {
   return (
-    <Card className="mb-6 border-0 bg-secondary text-secondary-foreground shadow-xl">
+    <Card className="mb-6 border-primary/10 bg-accent/35 shadow-lg shadow-primary/5">
       <CardContent className="p-6">
         <div className="flex items-center gap-3">
           <RefreshCw
@@ -134,7 +134,7 @@ function BatchLoadingState() {
           />
           <div>
             <p className="font-medium">Opening the accepted batch…</p>
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-muted-foreground">
               Pending results will appear here immediately.
             </p>
           </div>
