@@ -13,6 +13,7 @@ import (
 type Processor struct {
 	provider        PaymentProvider
 	providerTimeout time.Duration
+	providerSlots   chan struct{}
 	logger          *slog.Logger
 
 	mu          sync.RWMutex // protects obligations and batches
@@ -29,13 +30,16 @@ var (
 	ErrInvalidSubmission = errors.New("invalid submission")
 	// ErrDemoResetInProgress reports that demo data cannot reset while work is pending.
 	ErrDemoResetInProgress = errors.New("cannot reset demo while a batch is processing")
+	// ErrBatchNotFound reports a command for a batch that is not in process-local state.
+	ErrBatchNotFound = errors.New("batch not found")
 )
 
 // ProcessorConfig contains the dependencies and timeout used by a Processor.
 type ProcessorConfig struct {
-	Provider        PaymentProvider
-	ProviderTimeout time.Duration
-	Logger          *slog.Logger
+	Provider                   PaymentProvider
+	ProviderTimeout            time.Duration
+	ProviderMaxConcurrentCalls int
+	Logger                     *slog.Logger
 }
 
 // NewProcessor creates a processor for a fixed set of payment obligations.
@@ -57,9 +61,15 @@ func NewProcessor(
 		return nil, err
 	}
 
+	maxConcurrentProviderCalls := config.ProviderMaxConcurrentCalls
+	if maxConcurrentProviderCalls == 0 {
+		maxConcurrentProviderCalls = len(workers)
+	}
+
 	return &Processor{
 		provider:        config.Provider,
 		providerTimeout: config.ProviderTimeout,
+		providerSlots:   make(chan struct{}, maxConcurrentProviderCalls),
 		logger:          logger,
 		workerOrder:     workerOrder,
 		obligations:     obligations,
@@ -85,6 +95,9 @@ func validateProcessorConfiguration(
 	}
 	if config.ProviderTimeout <= 0 {
 		return fmt.Errorf("%w: provider timeout must be positive", ErrInvalidProcessor)
+	}
+	if config.ProviderMaxConcurrentCalls < 0 {
+		return fmt.Errorf("%w: provider max concurrent calls cannot be negative", ErrInvalidProcessor)
 	}
 	return nil
 }

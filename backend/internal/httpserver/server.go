@@ -54,5 +54,6 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /workers", s.handleListWorkers)
 	s.mux.HandleFunc("POST /disbursements", s.handleSubmitDisbursements)
 	s.mux.HandleFunc("GET /disbursements/{batch_id}", s.handleGetDisbursementBatch)
+	s.mux.HandleFunc("POST /disbursements/{batch_id}/cancel", s.handleCancelDisbursementBatch)
 	s.mux.HandleFunc("POST /demo/reset", s.handleResetDemo)
 }

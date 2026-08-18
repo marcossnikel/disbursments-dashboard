@@ -3,6 +3,7 @@ import AlertCircle from "lucide-react/dist/esm/icons/alert-circle.mjs";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BatchConfirmationDialog } from "@/features/disbursements/BatchConfirmationDialog";
+import { BatchCancellationDialog } from "@/features/disbursements/BatchCancellationDialog";
 import { BatchProgress } from "@/features/disbursements/BatchProgress";
 import { DemoResetDialog } from "@/features/disbursements/DemoResetDialog";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/features/disbursements/DisbursementDashboardStates";
 import { workersQueryOptions } from "@/features/disbursements/queries";
 import { useBatchSubmission } from "@/features/disbursements/useBatchSubmission";
+import { useBatchCancellation } from "@/features/disbursements/useBatchCancellation";
 import { useBatchTracking } from "@/features/disbursements/useBatchTracking";
 import { useDemoReset } from "@/features/disbursements/useDemoReset";
 import { useRetryPreparation } from "@/features/disbursements/useRetryPreparation";
@@ -45,6 +47,15 @@ export function DisbursementDashboard() {
     },
   });
   const batchQuery = batchTracking.batchQuery;
+  const batchCancellation = useBatchCancellation(
+    batchQuery.data?.batch_id ?? null,
+  );
+  const pendingCancellationCount =
+    batchQuery.data?.results.filter((result) => result.status === "pending")
+      .length ?? 0;
+  const inFlightCount =
+    batchQuery.data?.results.filter((result) => result.status === "in_flight")
+      .length ?? 0;
 
   async function refreshWorkers() {
     const refreshedWorkers = await workersQuery.refetch();
@@ -100,6 +111,9 @@ export function DisbursementDashboard() {
           onPrepareRetry={(workerID) =>
             void retryPreparation.prepareRetry(workerID)
           }
+          isCanceling={batchCancellation.isCanceling}
+          cancellationFeedback={batchCancellation.feedbackMessage}
+          onCancel={batchCancellation.open}
         />
       ) : null}
 
@@ -153,6 +167,15 @@ export function DisbursementDashboard() {
         errorMessage={demoReset.errorMessage}
         onOpenChange={demoReset.changeOpen}
         onConfirm={demoReset.confirmReset}
+      />
+      <BatchCancellationDialog
+        open={batchCancellation.isOpen}
+        pendingCount={pendingCancellationCount}
+        inFlightCount={inFlightCount}
+        isCanceling={batchCancellation.isCanceling}
+        errorMessage={batchCancellation.errorMessage}
+        onOpenChange={batchCancellation.changeOpen}
+        onConfirm={batchCancellation.confirmCancellation}
       />
     </>
   );

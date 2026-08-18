@@ -143,6 +143,7 @@ func testWorkers(t *testing.T, count int) []disbursement.Worker {
 	}{
 		{id: "w-001", name: "Worker One", amount: "100.00", currency: disbursement.USD},
 		{id: "w-002", name: "Worker Two", amount: "200.00", currency: disbursement.EUR},
+		{id: "w-003", name: "Worker Three", amount: "300.00", currency: disbursement.USD},
 	}
 	workers := make([]disbursement.Worker, 0, count)
 	for _, definition := range definitions[:count] {

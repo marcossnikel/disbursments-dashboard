@@ -157,6 +157,79 @@ describe("DisbursementDashboard", () => {
     await waitFor(() => expect(workerReadCount).toBeGreaterThanOrEqual(3));
   });
 
+  it("cancels queued payments while in-flight provider calls continue", async () => {
+    window.history.replaceState(null, "", "/?batch=batch-cancel-ui");
+    let cancellationRequested = false;
+    let batchReadCount = 0;
+    const fetchMock = vi.fn(async (request: Request) => {
+      const url = new URL(request.url);
+      if (request.method === "GET" && url.pathname === "/workers") {
+        return jsonResponse(cancellationRequested ? [workers[0]] : []);
+      }
+      if (
+        request.method === "GET" &&
+        url.pathname === "/disbursements/batch-cancel-ui"
+      ) {
+        batchReadCount++;
+        return jsonResponse(cancelableBatch(cancellationRequested));
+      }
+      if (
+        request.method === "POST" &&
+        url.pathname === "/disbursements/batch-cancel-ui/cancel"
+      ) {
+        cancellationRequested = true;
+        return jsonResponse({
+          canceled_count: 1,
+          batch: cancelableBatch(true),
+        });
+      }
+      return new Response(null, { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    renderDashboard();
+
+    await screen.findByText("Batch processing");
+    expect(screen.getByRole("button", { name: "Cancel batch" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Cancel batch" }));
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Cancel queued payments?",
+    });
+    expect(
+      within(dialog).getByText(/cancel 1 queued payment/i),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/1 in-flight payment/i),
+    ).toBeInTheDocument();
+    await user.click(
+      within(dialog).getByRole("button", { name: "Cancel queued payments" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "1 queued payment canceled. Any in-flight provider calls will continue to a final result.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Canceled").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("In flight").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: "Cancel batch" })).toBeDisabled();
+    expect(
+      fetchMock.mock.calls.some(([request]) => {
+        const calledRequest = request as Request;
+        return (
+          calledRequest.method === "POST" &&
+          new URL(calledRequest.url).pathname ===
+            "/disbursements/batch-cancel-ui/cancel"
+        );
+      }),
+    ).toBe(true);
+    await waitFor(() => expect(batchReadCount).toBeGreaterThan(1), {
+      timeout: 2_000,
+    });
+  });
+
   it("restores an accepted batch from the URL after a refresh", async () => {
     window.history.replaceState(null, "", "/?batch=batch-restored");
     vi.stubGlobal(
@@ -532,4 +605,29 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
+}
+
+function cancelableBatch(canceled: boolean) {
+  return {
+    batch_id: "batch-cancel-ui",
+    status: "processing",
+    results: [
+      {
+        disbursement_id: "disb-pending",
+        worker_id: "w-001",
+        worker_name: "Maya Thompson",
+        amount: "1500.50",
+        currency: "USD",
+        status: canceled ? "canceled" : "pending",
+      },
+      {
+        disbursement_id: "disb-in-flight",
+        worker_id: "w-002",
+        worker_name: "Daniel Kim",
+        amount: "2300.00",
+        currency: "EUR",
+        status: "in_flight",
+      },
+    ],
+  };
 }

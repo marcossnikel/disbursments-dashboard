@@ -42,6 +42,9 @@ func TestNewProcessorRejectsInvalidConfiguration(t *testing.T) {
 		{name: "missing provider", workers: validWorkers, config: disbursement.ProcessorConfig{ProviderTimeout: time.Second}},
 		{name: "zero provider timeout", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}}},
 		{name: "negative provider timeout", workers: validWorkers, config: disbursement.ProcessorConfig{Provider: timeoutProvider{}, ProviderTimeout: -time.Second}},
+		{name: "negative provider concurrency", workers: validWorkers, config: disbursement.ProcessorConfig{
+			Provider: timeoutProvider{}, ProviderTimeout: time.Second, ProviderMaxConcurrentCalls: -1,
+		}},
 		{name: "duplicate worker ID", workers: duplicateWorkers, config: validConfig},
 	}
 

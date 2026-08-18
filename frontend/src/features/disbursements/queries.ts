@@ -5,6 +5,7 @@ import { apiClient, apiError } from "@/api/client";
 
 export type Worker = components["schemas"]["Worker"];
 export type BatchSnapshot = components["schemas"]["BatchSnapshot"];
+export type CancelBatchResponse = components["schemas"]["CancelBatchResponse"];
 
 export type SubmitBatchInput = {
   batchID: string;
@@ -55,6 +56,19 @@ export async function submitBatch({
       worker_ids: workerIDs,
     },
   });
+  if (!response.ok || !data) {
+    throw apiError(response, error);
+  }
+  return data;
+}
+
+export async function cancelBatch(
+  batchID: string,
+): Promise<CancelBatchResponse> {
+  const { data, error, response } = await apiClient.POST(
+    "/disbursements/{batch_id}/cancel",
+    { params: { path: { batch_id: batchID } } },
+  );
   if (!response.ok || !data) {
     throw apiError(response, error);
   }

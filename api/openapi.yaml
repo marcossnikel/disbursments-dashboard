@@ -93,6 +93,38 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
           $ref: "#/components/responses/InternalError"
+  /disbursements/{batch_id}/cancel:
+    post:
+      operationId: cancelDisbursementBatch
+      summary: Cancel payments that have not reached the provider
+      description: >-
+        Marks only pending disbursements as canceled. Provider calls that are
+        already in flight continue and record their normal terminal result.
+        Repeating this operation is safe and returns a canceled count of zero
+        when no pending disbursements remain.
+      parameters:
+        - $ref: "#/components/parameters/BatchID"
+      responses:
+        "200":
+          description: The latest batch snapshot after applying cancellation
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelBatchResponse"
+        "404":
+          description: Batch not found
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/RequestID"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /demo/reset:
     post:
       operationId: resetDemo
@@ -201,7 +233,7 @@ components:
       enum: [processing, completed]
     DisbursementStatus:
       type: string
-      enum: [pending, success, failed]
+      enum: [pending, in_flight, success, failed, canceled]
     ProviderErrorCode:
       type: string
       enum: [provider_declined, provider_error, provider_timeout]
@@ -254,6 +286,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DisbursementResult"
+    CancelBatchResponse:
+      type: object
+      additionalProperties: false
+      required: [canceled_count, batch]
+      properties:
+        canceled_count:
+          type: integer
+          minimum: 0
+          description: Number of pending disbursements canceled by this request.
+        batch:
+          $ref: "#/components/schemas/BatchSnapshot"
     ErrorCode:
       type: string
       enum:
