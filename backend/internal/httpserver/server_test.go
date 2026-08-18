@@ -33,7 +33,7 @@ type gatedProvider struct {
 
 func newGatedProvider(failingWorker disbursement.WorkerID) *gatedProvider {
 	return &gatedProvider{
-		started:       make(chan disbursement.PaymentRequest, 2),
+		started:       make(chan disbursement.PaymentRequest, 10),
 		release:       make(chan struct{}),
 		failingWorker: failingWorker,
 	}
@@ -108,6 +108,16 @@ func newTestProcessor(
 	workerCount int,
 	logger *slog.Logger,
 ) *disbursement.Processor {
+	return newTestProcessorWithConcurrency(t, provider, workerCount, logger, 0)
+}
+
+func newTestProcessorWithConcurrency(
+	t *testing.T,
+	provider disbursement.PaymentProvider,
+	workerCount int,
+	logger *slog.Logger,
+	providerMaxConcurrentCalls int,
+) *disbursement.Processor {
 	t.Helper()
 
 	workers, err := demodata.Workers()
@@ -115,7 +125,8 @@ func newTestProcessor(
 		t.Fatalf("Workers() error = %v", err)
 	}
 	processor, err := disbursement.NewProcessor(workers[:workerCount], disbursement.ProcessorConfig{
-		Provider: provider, ProviderTimeout: time.Second, Logger: logger,
+		Provider: provider, ProviderTimeout: time.Second,
+		ProviderMaxConcurrentCalls: providerMaxConcurrentCalls, Logger: logger,
 	})
 	if err != nil {
 		t.Fatalf("NewProcessor() error = %v", err)
@@ -129,9 +140,21 @@ func newTestServer(
 	workerCount int,
 	logger *slog.Logger,
 ) *httptest.Server {
+	return newTestServerWithConcurrency(t, provider, workerCount, logger, 0)
+}
+
+func newTestServerWithConcurrency(
+	t *testing.T,
+	provider disbursement.PaymentProvider,
+	workerCount int,
+	logger *slog.Logger,
+	providerMaxConcurrentCalls int,
+) *httptest.Server {
 	t.Helper()
 
-	processor := newTestProcessor(t, provider, workerCount, logger)
+	processor := newTestProcessorWithConcurrency(
+		t, provider, workerCount, logger, providerMaxConcurrentCalls,
+	)
 	handler, err := httpserver.New(
 		processor,
 		logger,
@@ -182,6 +205,24 @@ func postDemoReset(t *testing.T, client *http.Client, serverURL string) *http.Re
 	response, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("POST /demo/reset error = %v", err)
+	}
+	return response
+}
+
+func postBatchCancellation(t *testing.T, client *http.Client, serverURL, batchID string) *http.Response {
+	t.Helper()
+	request, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPost,
+		serverURL+"/disbursements/"+batchID+"/cancel",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("create batch cancellation request: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("POST batch cancellation error = %v", err)
 	}
 	return response
 }

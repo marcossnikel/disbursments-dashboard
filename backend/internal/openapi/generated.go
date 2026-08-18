@@ -41,15 +41,21 @@ func (e Currency) Valid() bool {
 
 // Defines values for DisbursementStatus.
 const (
-	Failed  DisbursementStatus = "failed"
-	Pending DisbursementStatus = "pending"
-	Success DisbursementStatus = "success"
+	Canceled DisbursementStatus = "canceled"
+	Failed   DisbursementStatus = "failed"
+	InFlight DisbursementStatus = "in_flight"
+	Pending  DisbursementStatus = "pending"
+	Success  DisbursementStatus = "success"
 )
 
 // Valid indicates whether the value is a known member of the DisbursementStatus enum.
 func (e DisbursementStatus) Valid() bool {
 	switch e {
+	case Canceled:
+		return true
 	case Failed:
+		return true
+	case InFlight:
 		return true
 	case Pending:
 		return true
@@ -142,6 +148,14 @@ type BatchSnapshot struct {
 
 // BatchStatus defines model for BatchStatus.
 type BatchStatus string
+
+// CancelBatchResponse defines model for CancelBatchResponse.
+type CancelBatchResponse struct {
+	Batch BatchSnapshot `json:"batch"`
+
+	// CanceledCount Number of pending disbursements canceled by this request.
+	CanceledCount int `json:"canceled_count"`
+}
 
 // Currency defines model for Currency.
 type Currency string

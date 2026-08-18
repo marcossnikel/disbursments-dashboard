@@ -70,6 +70,43 @@ func (s *Server) handleGetDisbursementBatch(responseWriter http.ResponseWriter, 
 	s.writeJSON(responseWriter, http.StatusOK, mapBatchSnapshot(snapshot))
 }
 
+func (s *Server) handleCancelDisbursementBatch(responseWriter http.ResponseWriter, request *http.Request) {
+	batchID := disbursement.BatchID(request.PathValue("batch_id"))
+	cancellation, err := s.processor.CancelBatch(request.Context(), batchID)
+	if errors.Is(err, disbursement.ErrBatchNotFound) {
+		s.writeError(
+			responseWriter,
+			request,
+			http.StatusNotFound,
+			openapi.ErrorCodeBatchNotFound,
+			"The requested batch was not found.",
+		)
+		return
+	}
+	if err != nil {
+		s.logger.ErrorContext(
+			request.Context(),
+			"cancel disbursement batch",
+			"request_id", requestIDFrom(request),
+			"batch_id", batchID,
+			"error", err,
+		)
+		s.writeError(
+			responseWriter,
+			request,
+			http.StatusInternalServerError,
+			openapi.ErrorCodeInternalError,
+			"The batch could not be canceled.",
+		)
+		return
+	}
+
+	s.writeJSON(responseWriter, http.StatusOK, openapi.CancelBatchResponse{
+		Batch:         mapBatchSnapshot(cancellation.Batch),
+		CanceledCount: cancellation.CanceledCount,
+	})
+}
+
 func (s *Server) writeSubmissionError(
 	responseWriter http.ResponseWriter,
 	request *http.Request,

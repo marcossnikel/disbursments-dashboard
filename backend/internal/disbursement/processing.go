@@ -10,7 +10,19 @@ func (p *Processor) processPayment(
 	ctx context.Context,
 	batchID BatchID,
 	request PaymentRequest,
+	cancelPending <-chan struct{},
 ) {
+	select {
+	case p.providerSlots <- struct{}{}:
+		defer func() { <-p.providerSlots }()
+	case <-cancelPending:
+		return
+	}
+
+	if !p.startProviderCall(batchID, request.WorkerID) {
+		return
+	}
+
 	paymentContext, cancel := context.WithTimeout(ctx, p.providerTimeout)
 	defer cancel()
 
@@ -37,6 +49,22 @@ func (p *Processor) processPayment(
 	}
 }
 
+func (p *Processor) startProviderCall(batchID BatchID, workerID WorkerID) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	storedBatch, exists := p.batches[batchID]
+	if !exists {
+		return false
+	}
+	result := storedBatch.results[workerID]
+	if result.Status != StatusPending {
+		return false
+	}
+	result.Status = StatusInFlight
+	return true
+}
+
 func (p *Processor) recordPaymentResult(
 	batchID BatchID,
 	request PaymentRequest,
@@ -59,8 +87,8 @@ func (p *Processor) recordPaymentResult(
 		currentObligation.status = obligationAvailable
 	}
 
-	storedBatch.pendingCount--
-	return *result, storedBatch.pendingCount == 0
+	storedBatch.activeCount--
+	return *result, storedBatch.activeCount == 0
 }
 
 func classifyProviderError(err error) (ProviderErrorCode, string) {

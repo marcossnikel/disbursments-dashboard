@@ -10,8 +10,9 @@ import (
 )
 
 type preparedSubmission struct {
-	requests []PaymentRequest
-	created  bool
+	requests      []PaymentRequest
+	cancelPending <-chan struct{}
+	created       bool
 }
 
 // Submission identifies a batch and whether this call created its provider work.
@@ -94,7 +95,7 @@ func (p *Processor) Submit(
 	)
 	for _, request := range prepared.requests {
 		p.jobs.Go(func() {
-			p.processPayment(ctx, batchID, request)
+			p.processPayment(ctx, batchID, request, prepared.cancelPending)
 		})
 	}
 
@@ -155,14 +156,18 @@ func (p *Processor) prepareSubmission(
 		currentObligation.disbursementID = disbursementID
 	}
 
+	cancelPending := make(chan struct{})
 	p.batches[batchID] = &storedBatch{
 		id:                 batchID,
 		canonicalWorkerIDs: canonicalWorkerIDs,
 		resultOrder:        slices.Clone(workerIDs),
 		results:            results,
-		pendingCount:       len(workerIDs),
+		activeCount:        len(workerIDs),
+		cancelPending:      cancelPending,
 	}
-	return preparedSubmission{requests: requests, created: true}, nil
+	return preparedSubmission{
+		requests: requests, cancelPending: cancelPending, created: true,
+	}, nil
 }
 
 func (p *Processor) logRejectedSubmission(ctx context.Context, batchID BatchID, err error) {

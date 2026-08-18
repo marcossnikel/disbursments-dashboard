@@ -8,7 +8,7 @@ func (p *Processor) ResetDemo() error {
 	defer p.mu.Unlock()
 
 	for _, storedBatch := range p.batches {
-		if storedBatch.pendingCount > 0 {
+		if storedBatch.activeCount > 0 {
 			return ErrDemoResetInProgress
 		}
 	}

@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/disbursements/{batch_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel payments that have not reached the provider
+         * @description Marks only pending disbursements as canceled. Provider calls that are already in flight continue and record their normal terminal result. Repeating this operation is safe and returns a canceled count of zero when no pending disbursements remain.
+         */
+        post: operations["cancelDisbursementBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/demo/reset": {
         parameters: {
             query?: never;
@@ -103,7 +123,7 @@ export interface components {
         /** @enum {string} */
         BatchStatus: "processing" | "completed";
         /** @enum {string} */
-        DisbursementStatus: "pending" | "success" | "failed";
+        DisbursementStatus: "pending" | "in_flight" | "success" | "failed" | "canceled";
         /** @enum {string} */
         ProviderErrorCode: "provider_declined" | "provider_error" | "provider_timeout";
         DisbursementResult: {
@@ -128,6 +148,11 @@ export interface components {
             batch_id: components["schemas"]["BatchID"];
             status: components["schemas"]["BatchStatus"];
             results: components["schemas"]["DisbursementResult"][];
+        };
+        CancelBatchResponse: {
+            /** @description Number of pending disbursements canceled by this request. */
+            canceled_count: number;
+            batch: components["schemas"]["BatchSnapshot"];
         };
         /** @enum {string} */
         ErrorCode: "invalid_request" | "batch_not_found" | "idempotency_conflict" | "workers_unavailable" | "demo_reset_in_progress" | "internal_error";
@@ -269,6 +294,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchSnapshot"];
+                };
+            };
+            /** @description Batch not found */
+            404: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    cancelDisbursementBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: components["parameters"]["BatchID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The latest batch snapshot after applying cancellation */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["RequestID"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelBatchResponse"];
                 };
             };
             /** @description Batch not found */

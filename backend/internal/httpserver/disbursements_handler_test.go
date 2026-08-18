@@ -25,16 +25,16 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 	var submission openapi.SubmitBatchResponse
 	decodeJSON(t, response, &submission)
 
-	pending := getBatch(t, testServer.Client(), testServer.URL, submission.BatchID)
-	if got, want := pending.Status, openapi.Processing; got != want {
+	waitForPaymentStarts(t, provider.started, 2)
+	processing := getBatch(t, testServer.Client(), testServer.URL, submission.BatchID)
+	if got, want := processing.Status, openapi.Processing; got != want {
 		t.Errorf("initial batch status = %q, want %q", got, want)
 	}
-	for _, result := range pending.Results {
-		if got, want := result.Status, openapi.Pending; got != want {
+	for _, result := range processing.Results {
+		if got, want := result.Status, openapi.InFlight; got != want {
 			t.Errorf("initial worker %q status = %q, want %q", result.WorkerID, got, want)
 		}
 	}
-	waitForPaymentStarts(t, provider.started, 2)
 	close(provider.release)
 
 	completed := waitForCompletedBatch(t, testServer.Client(), testServer.URL, submission.BatchID)
@@ -78,6 +78,86 @@ func TestServerExposesTheAsynchronousBatchLifecycle(t *testing.T) {
 	}
 	if got, want := conflict.RequestID, conflictResponse.Header.Get("X-Request-ID"); got != want {
 		t.Errorf("conflict request ID = %q, want header value %q", got, want)
+	}
+}
+
+func TestServerCancelsOnlyPaymentsThatHaveNotReachedTheProvider(t *testing.T) {
+	t.Parallel()
+
+	provider := newGatedProvider("")
+	testServer := newTestServerWithConcurrency(
+		t,
+		provider,
+		3,
+		slog.New(slog.DiscardHandler),
+		2,
+	)
+	const batchID = "batch-http-cancel"
+	response := postBatch(t, testServer.Client(), testServer.URL, openapi.SubmitBatchRequest{
+		BatchID: batchID, WorkerIDs: []string{"w-001", "w-002", "w-003"},
+	})
+	decodeJSON(t, response, &openapi.SubmitBatchResponse{})
+	startedRequests := waitForPaymentStarts(t, provider.started, 2)
+	startedWorkers := map[string]bool{}
+	for _, request := range startedRequests {
+		startedWorkers[string(request.WorkerID)] = true
+	}
+
+	cancelResponse := postBatchCancellation(t, testServer.Client(), testServer.URL, batchID)
+	if got, want := cancelResponse.StatusCode, http.StatusOK; got != want {
+		cancelResponse.Body.Close()
+		t.Fatalf("POST cancellation status = %d, want %d", got, want)
+	}
+	var cancellation openapi.CancelBatchResponse
+	decodeJSON(t, cancelResponse, &cancellation)
+	if got, want := cancellation.CanceledCount, 1; got != want {
+		t.Fatalf("canceled count = %d, want %d", got, want)
+	}
+	if got, want := cancellation.Batch.Status, openapi.Processing; got != want {
+		t.Errorf("batch status after cancellation = %q, want %q", got, want)
+	}
+	canceledWorkerID := ""
+	for _, result := range cancellation.Batch.Results {
+		if result.Status == openapi.Canceled {
+			canceledWorkerID = result.WorkerID
+		}
+	}
+	if canceledWorkerID == "" {
+		t.Fatal("canceled worker ID is empty")
+	}
+	if startedWorkers[canceledWorkerID] {
+		t.Errorf("canceled worker %q had reached the provider", canceledWorkerID)
+	}
+
+	repeatedResponse := postBatchCancellation(t, testServer.Client(), testServer.URL, batchID)
+	var repeated openapi.CancelBatchResponse
+	decodeJSON(t, repeatedResponse, &repeated)
+	if got := repeated.CanceledCount; got != 0 {
+		t.Errorf("repeated canceled count = %d, want 0", got)
+	}
+
+	close(provider.release)
+	completed := waitForCompletedBatch(t, testServer.Client(), testServer.URL, batchID)
+	for _, result := range completed.Results {
+		if result.WorkerID == canceledWorkerID && result.Status != openapi.Canceled {
+			t.Errorf("canceled worker final status = %q, want %q", result.Status, openapi.Canceled)
+		}
+	}
+	select {
+	case request := <-provider.started:
+		t.Errorf("canceled payment reached provider for worker %q", request.WorkerID)
+	default:
+	}
+
+	missingResponse := postBatchCancellation(t, testServer.Client(), testServer.URL, "batch-missing")
+	if got, want := missingResponse.StatusCode, http.StatusNotFound; got != want {
+		missingResponse.Body.Close()
+		t.Fatalf("missing cancellation status = %d, want %d", got, want)
+	}
+	var missingError openapi.ErrorResponse
+	decodeJSON(t, missingResponse, &missingError)
+	if got, want := missingError.Code, openapi.ErrorCodeBatchNotFound; got != want {
+		t.Errorf("missing cancellation code = %q, want %q", got, want)
 	}
 }
 

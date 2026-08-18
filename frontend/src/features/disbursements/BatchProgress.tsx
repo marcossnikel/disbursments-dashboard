@@ -1,5 +1,6 @@
 import CheckCircle2 from "lucide-react/dist/esm/icons/check-circle-2.mjs";
 import CircleAlert from "lucide-react/dist/esm/icons/circle-alert.mjs";
+import CircleX from "lucide-react/dist/esm/icons/circle-x.mjs";
 import LoaderCircle from "lucide-react/dist/esm/icons/loader-circle.mjs";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
@@ -27,11 +28,22 @@ type BatchProgressProps = {
   onRefresh: () => void;
   retryingWorkerID: string | null;
   onPrepareRetry: (workerID: string) => void;
+  isCanceling: boolean;
+  cancellationFeedback: string | null;
+  onCancel: () => void;
 };
 const statusDetails = {
   pending: {
     label: "Pending",
-    description: "The provider call is still in progress. No action is needed.",
+    description:
+      "This payment is queued and has not reached the provider, so it can still be canceled.",
+    className: "bg-status-warning-soft text-status-warning",
+    icon: RefreshCw,
+  },
+  in_flight: {
+    label: "In flight",
+    description:
+      "The provider call has started. It cannot be canceled and will record its final result.",
     className: "bg-status-warning-soft text-status-warning",
     icon: LoaderCircle,
   },
@@ -49,6 +61,13 @@ const statusDetails = {
     className: "bg-status-danger-soft text-status-danger",
     icon: CircleAlert,
   },
+  canceled: {
+    label: "Canceled",
+    description:
+      "This payment was canceled before reaching the provider. Its obligation is available again.",
+    className: "bg-muted text-muted-foreground",
+    icon: CircleX,
+  },
 } as const;
 
 export function BatchProgress({
@@ -59,9 +78,13 @@ export function BatchProgress({
   onRefresh,
   retryingWorkerID,
   onPrepareRetry,
+  isCanceling,
+  cancellationFeedback,
+  onCancel,
 }: BatchProgressProps) {
   const counts = countStatuses(batch);
-  const completedCount = batch.results.length - counts.pending;
+  const completedCount =
+    batch.results.length - counts.pending - counts.in_flight;
   const completionPercentage =
     batch.results.length === 0
       ? 0
@@ -90,7 +113,25 @@ export function BatchProgress({
                 Live payment results
               </h2>
             </div>
-            <BatchIDCopyButton batchID={batch.batch_id} />
+            <div className="flex flex-wrap items-center gap-2">
+              {batch.status === "processing" ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                  disabled={isCanceling || counts.pending === 0}
+                  onClick={onCancel}
+                >
+                  {isCanceling ? (
+                    <LoaderCircle aria-hidden="true" className="animate-spin" />
+                  ) : (
+                    <CircleX aria-hidden="true" />
+                  )}
+                  {isCanceling ? "Canceling…" : "Cancel batch"}
+                </Button>
+              ) : null}
+              <BatchIDCopyButton batchID={batch.batch_id} />
+            </div>
           </div>
 
           <div>
@@ -105,12 +146,20 @@ export function BatchProgress({
             />
           </div>
 
-          <dl className="grid grid-cols-3 gap-2">
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <SummaryCount label="Pending" value={counts.pending} />
+            <SummaryCount label="In flight" value={counts.in_flight} />
             <SummaryCount label="Succeeded" value={counts.success} />
             <SummaryCount label="Failed" value={counts.failed} />
+            <SummaryCount label="Canceled" value={counts.canceled} />
           </dl>
         </div>
+
+        {cancellationFeedback ? (
+          <div className="border-b border-white/10 px-5 py-4 text-sm text-white/70 sm:px-6">
+            {cancellationFeedback}
+          </div>
+        ) : null}
 
         {refreshFailed ? (
           <div className="border-b border-white/10 px-5 py-4 sm:px-6">
@@ -169,7 +218,7 @@ export function BatchProgress({
                             aria-hidden="true"
                             className={cn(
                               "size-3",
-                              result.status === "pending" && "animate-spin",
+                              result.status === "in_flight" && "animate-spin",
                             )}
                           />
                           {details.label}
@@ -251,7 +300,13 @@ function SummaryCount({ label, value }: { label: string; value: number }) {
 }
 
 function countStatuses(batch: BatchSnapshot) {
-  const counts = { pending: 0, success: 0, failed: 0 };
+  const counts = {
+    pending: 0,
+    in_flight: 0,
+    success: 0,
+    failed: 0,
+    canceled: 0,
+  };
   for (const result of batch.results) {
     counts[result.status]++;
   }
